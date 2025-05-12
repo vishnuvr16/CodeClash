@@ -1,0 +1,130 @@
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom"
+import { ToastContainer } from "react-toastify"
+import "react-toastify/dist/ReactToastify.css"
+
+// Context Providers
+import { AuthProvider } from "./contexts/AuthContext"
+import { SocketProvider } from "./contexts/SocketContext"
+
+// Pages
+import LandingPage from "./pages/LandingPage"
+import LoginPage from "./pages/auth/LoginPage"
+import RegisterPage from "./pages/auth/RegisterPage"
+import GoogleCallback from "./pages/auth/GoogleCallback"
+import Dashboard from "./pages/Dashboard"
+import MatchmakingPage from "./pages/MatchmakingPage"
+import DuelPage from "./pages/DuelPage"
+import ResultPage from "./pages/ResultPage"
+import LeaderboardPage from "./pages/LeaderboardPage"
+import PracticePage from "./pages/PracticePage"
+import PracticeProblemPage from "./pages/PracticeProblemPage"
+import SettingsPage from "./pages/SettingsPage"
+import MatchHistoryPage from "./pages/MatchHistoryPage"
+import NotFoundPage from "./pages/NotFoundPage"
+
+// Protected Route Component
+const ProtectedRoute = ({ children }) => {
+  const token = localStorage.getItem("token")
+  if (!token) {
+    return <Navigate to="/login" replace />
+  }
+  return children
+}
+
+function App() {
+  return (
+    <Router>
+      <AuthProvider>
+        <SocketProvider>
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/auth/google/callback" element={<GoogleCallback />} />
+
+            {/* Protected Routes */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/matchmaking"
+              element={
+                <ProtectedRoute>
+                  <MatchmakingPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/duel/:matchId"
+              element={
+                <ProtectedRoute>
+                  <DuelPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/result/:matchId"
+              element={
+                <ProtectedRoute>
+                  <ResultPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/leaderboard"
+              element={
+                <ProtectedRoute>
+                  <LeaderboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/practice"
+              element={
+                <ProtectedRoute>
+                  <PracticePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/practice/:problemId"
+              element={
+                <ProtectedRoute>
+                  <PracticeProblemPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <SettingsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/history"
+              element={
+                <ProtectedRoute>
+                  <MatchHistoryPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* 404 Route */}
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+          <ToastContainer position="top-right" autoClose={3000} theme="dark" />
+        </SocketProvider>
+      </AuthProvider>
+    </Router>
+  )
+}
+
+export default App
