@@ -23,7 +23,7 @@ const Navbar = () => {
           <div className="flex items-center">
             <Link to="/" className="flex-shrink-0 flex items-center">
               <span className="text-xl font-bold text-white">
-                PeerPrep<span className="text-purple-400">Duel</span>
+                CodeClash<span className="text-purple-400">&lt; / &gt;</span>
               </span>
             </Link>
 
@@ -50,7 +50,7 @@ const Navbar = () => {
               )}
               {isAuthenticated && (
                 <Link
-                to="/match/history"
+                to="/history"
                 className="px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:text-white hover:bg-gray-700"
               >
                 History

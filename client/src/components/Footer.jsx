@@ -9,7 +9,7 @@ const Footer = () => {
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center">
               <span className="text-xl font-bold text-white">
-                PeerPrep<span className="text-purple-400">Duel</span>
+                CodeClash<span className="text-purple-400">&lt; / &gt;</span>
               </span>
             </div>
             <p className="mt-4 text-gray-400 max-w-md">
@@ -87,7 +87,7 @@ const Footer = () => {
 
         <div className="mt-12 border-t border-gray-800 pt-8">
           <p className="text-base text-gray-400 text-center">
-            &copy; {new Date().getFullYear()} PeerPrep Duel. All rights reserved.
+            &copy; {new Date().getFullYear()} CodeClash. Made by Vishnu
           </p>
         </div>
       </div>

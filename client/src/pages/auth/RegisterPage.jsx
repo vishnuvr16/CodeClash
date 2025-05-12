@@ -222,7 +222,7 @@ const RegisterPage = () => {
         <div className="bg-gray-800 rounded-lg shadow-lg p-8">
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold">Create an Account</h2>
-            <p className="text-gray-400 mt-2">Join PeerPrep Duel and start coding challenges</p>
+            <p className="text-gray-400 mt-2">Join CodeClash and start coding challenges</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">

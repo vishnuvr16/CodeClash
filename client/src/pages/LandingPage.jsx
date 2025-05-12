@@ -17,7 +17,7 @@ const LandingPage = () => {
       name: "Alex Chen",
       role: "Software Engineer at Google",
       image: "/api/placeholder/80/80",
-      text: "PeerPrep Duel completely transformed how I practice for coding interviews. The competitive element makes learning algorithms actually fun!"
+      text: "CodeClash completely transformed how I practice for coding interviews. The competitive element makes learning algorithms actually fun!"
     },
     {
       name: "Sarah Johnson",
@@ -99,7 +99,7 @@ const LandingPage = () => {
               </div>
               
               <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight leading-tight">
-                <span className="block">PeerPrep</span>
+                <span className="block">CodeClash</span>
                 <span className="bg-gradient-to-r from-purple-400 to-blue-400 text-transparent bg-clip-text">Duel</span>
               </h1>
               
@@ -299,7 +299,7 @@ const LandingPage = () => {
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-900 relative overflow-hidden">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">How PeerPrep Duel Works</h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">How CodeClash Works</h2>
             <p className="text-xl text-gray-400 max-w-3xl mx-auto">
               Our platform combines competitive coding with effective learning to help you master technical interviews.
             </p>
@@ -361,7 +361,7 @@ const LandingPage = () => {
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">What Our Users Say</h2>
             <p className="text-xl text-gray-400 max-w-3xl mx-auto">
-              Join thousands of developers who are already improving their skills with PeerPrep Duel.
+              Join thousands of developers who are already improving their skills with CodeClash.
             </p>
           </div>
 
