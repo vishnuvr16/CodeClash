@@ -24,6 +24,8 @@ export const SocketProvider = ({ children }) => {
         auth: {
           token,
         },
+        transports: ["websocket"],
+        withCredentials: true,
         reconnection: true,
         reconnectionAttempts: 5,
         reconnectionDelay: 1000,
