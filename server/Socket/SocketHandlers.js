@@ -72,7 +72,7 @@ const setupSocketHandlers = (io) => {
         joinedAt: new Date(),
       })
 
-      console.log(`User ${socket.user.username} joined matchmaking queue`)
+      // console.log(`User ${socket.user.username} joined matchmaking queue`)
       socket.emit("matchmaking_joined")
 
       // Try to find a match
@@ -91,7 +91,7 @@ const setupSocketHandlers = (io) => {
       // Remove user from queue
       matchmakingQueue = matchmakingQueue.filter((user) => user.id !== userId)
 
-      console.log(`User ${socket.user.username} left matchmaking queue`)
+      // console.log(`User ${socket.user.username} left matchmaking queue`)
       socket.emit("matchmaking_cancelled")
     })
 
@@ -125,7 +125,7 @@ const setupSocketHandlers = (io) => {
 
         // Join match room
         socket.join(matchId)
-        console.log(`User ${socket.user.username} joined match room ${matchId}`)
+        // console.log(`User ${socket.user.username} joined match room ${matchId}`)
 
         // Store socket in active matches
         if (!activeMatches.has(matchId)) {
@@ -257,7 +257,7 @@ const setupSocketHandlers = (io) => {
 
     // Handle disconnection
     socket.on("disconnect", () => {
-      console.log("User disconnected:", socket.id)
+      // console.log("User disconnected:", socket.id)
 
       if (!socket.user) return
 
@@ -359,7 +359,7 @@ const setupSocketHandlers = (io) => {
         },
       })
 
-      console.log(`Match created between ${socket.user.username} and ${opponentUser.username}`)
+      // console.log(`Match created between ${socket.user.username} and ${opponentUser.username}`)
     } catch (error) {
       console.error("Error creating match:", error)
 

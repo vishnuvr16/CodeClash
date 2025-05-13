@@ -131,7 +131,7 @@ const DuelPage = () => {
 
     // Listen for match started event
     const handleMatchStarted = (data) => {
-      console.log("Match started:", data)
+      // console.log("Match started:", data)
       // Update match data if needed
     }
 
