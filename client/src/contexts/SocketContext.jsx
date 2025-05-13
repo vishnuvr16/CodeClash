@@ -20,7 +20,7 @@ export const SocketProvider = ({ children }) => {
     if (isAuthenticated && currentUser) {
       // Connect to socket server with authentication
       const token = localStorage.getItem("token")
-      socketInstance = io(import.meta.env.REACT_APP_API_URL || "http://localhost:5000", {
+      socketInstance = io(import.meta.env.VITE_APP_API_URL || "http://localhost:5000", {
         auth: {
           token,
         },
