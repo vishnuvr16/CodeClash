@@ -20,7 +20,7 @@ export const SocketProvider = ({ children }) => {
     if (isAuthenticated && currentUser) {
       // Connect to socket server with authentication
       const token = localStorage.getItem("token")
-      socketInstance = io(import.meta.env.VITE_APP_API_URL || "http://localhost:5000", {
+      socketInstance = io(import.meta.env.VITE_APP_API_URL || "http://localhost:5173", {
         auth: {
           token,
         },
@@ -29,6 +29,11 @@ export const SocketProvider = ({ children }) => {
         reconnection: true,
         reconnectionAttempts: 5,
         reconnectionDelay: 1000,
+      })
+      // Set up socket event listeners
+      socketInstance.on("connect_error", (error) => {
+        console.error("Socket connection error:", error)
+        toast.error(`Connection error: ${error.message || "Unknown error"}`)
       })
 
       socketInstance.on("connect", () => {

@@ -1,4 +1,3 @@
-// ELO Rating System for PeerPrep Duel
 // This is a simplified implementation of the ELO rating system
 
 // Calculate new ratings after a match

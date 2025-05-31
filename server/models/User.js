@@ -34,35 +34,120 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 1200,
     },
-    totalMatches: {
+    matchesPlayed: {
       type: Number,
       default: 0,
     },
-    wins: {
+    matchesWon: {
       type: Number,
       default: 0,
     },
-    losses: {
+    matchesLost: {
       type: Number,
       default: 0,
     },
-    matchHistory: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Match",
-      },
-    ],
+    matchesTied: {
+      type: Number,
+      default: 0,
+    },
     solvedProblems: [
       {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Problem",
+        problemId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Problem",
+        },
+        solvedAt: {
+          type: Date,
+          default: Date.now,
+        },
+        language: String,
+        code: String,
+        executionTime: Number,
+        memoryUsed: Number,
       },
     ],
+    submissions: [
+      {
+        problemId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Problem",
+        },
+        code: String,
+        language: String,
+        status: String,
+        submittedAt: {
+          type: Date,
+          default: Date.now,
+        },
+        executionTime: Number,
+        memoryUsed: Number,
+        testResults: [
+          {
+            input: String,
+            expectedOutput: String,
+            actualOutput: String,
+            passed: Boolean,
+            executionTime: Number,
+          },
+        ],
+      },
+    ],
+    preferences: {
+      theme: {
+        type: String,
+        default: "dark",
+        enum: ["light", "dark"],
+      },
+      language: {
+        type: String,
+        default: "javascript",
+      },
+      fontSize: {
+        type: Number,
+        default: 14,
+      },
+      notifications: {
+        email: { type: Boolean, default: true },
+        push: { type: Boolean, default: true },
+      },
+    },
+    statistics: {
+      totalSubmissions: { type: Number, default: 0 },
+      acceptedSubmissions: { type: Number, default: 0 },
+      easyProblemsSolved: { type: Number, default: 0 },
+      mediumProblemsSolved: { type: Number, default: 0 },
+      hardProblemsSolved: { type: Number, default: 0 },
+      currentStreak: { type: Number, default: 0 },
+      longestStreak: { type: Number, default: 0 },
+      lastSolvedDate: Date,
+    },
   },
   {
     timestamps: true,
   },
 )
+
+// Virtual field for total problems solved
+userSchema.virtual("totalProblemsSolved").get(function () {
+  return this.solvedProblems.length
+})
+
+// Virtual field for acceptance rate
+userSchema.virtual("acceptanceRate").get(function () {
+  if (this.statistics.totalSubmissions === 0) return 0
+  return Math.round((this.statistics.acceptedSubmissions / this.statistics.totalSubmissions) * 100)
+})
+
+// Virtual field for win rate
+userSchema.virtual("winRate").get(function () {
+  if (this.matchesPlayed === 0) return 0
+  return Math.round((this.matchesWon / this.matchesPlayed) * 100)
+})
+
+// Ensure virtual fields are serialized
+userSchema.set("toJSON", { virtuals: true })
+userSchema.set("toObject", { virtuals: true })
+
 
 // Hash password before saving
 userSchema.pre("save", async function (next) {

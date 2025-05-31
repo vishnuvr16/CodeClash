@@ -1,559 +1,697 @@
-"use client"
-
 import { useState, useEffect, useRef } from "react"
-import { useParams, useNavigate, Link } from "react-router-dom"
+import { useParams, useNavigate } from "react-router-dom"
 import { useAuth } from "../contexts/AuthContext"
-import Navbar from "../components/Navbar"
-import Footer from "../components/Footer"
-import Editor from "@monaco-editor/react"
-import { 
-  Play, 
-  Send, 
-  ArrowLeft, 
-  CheckCircle, 
-  XCircle, 
-  Tag, 
-  ChevronDown, 
-  ChevronUp,
+import { Editor } from "@monaco-editor/react"
+import {
+  Play,
+  Send,
+  ArrowLeft,
+  Clock,
+  CheckCircle,
+  XCircle,
+  Settings,
   Maximize2,
   Minimize2,
-  Code,
-  FileText
+  RotateCcw,
+  Lightbulb,
+  Code2,
 } from "lucide-react"
 import api from "../utils/api"
+import Navbar from "../components/Navbar"
 import { toast } from "react-toastify"
 
 const PracticeProblemPage = () => {
   const { problemId } = useParams()
-  const { currentUser } = useAuth()
   const navigate = useNavigate()
+  const { currentUser } = useAuth()
+  const editorRef = useRef(null)
 
+  // Problem and submission state
   const [problem, setProblem] = useState(null)
   const [code, setCode] = useState("")
   const [language, setLanguage] = useState("javascript")
+  const [isLoading, setIsLoading] = useState(true)
   const [isRunning, setIsRunning] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [runOutput, setRunOutput] = useState("")
-  const [submissions, setSubmissions] = useState([])
-  const [isSolved, setIsSolved] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [showDescription, setShowDescription] = useState(true)
-  const [editorHeight, setEditorHeight] = useState("70vh")
-  const [isFullScreenEditor, setIsFullScreenEditor] = useState(false)
-  const [activeTab, setActiveTab] = useState("description") // For mobile view: 'description' or 'editor'
-  const [outputHeight, setOutputHeight] = useState(200)
-  const [windowWidth, setWindowWidth] = useState(
-    typeof window !== "undefined" ? window.innerWidth : 0
-  )
 
-  const editorRef = useRef(null)
-  const containerRef = useRef(null)
+  // UI state
+  const [activeTab, setActiveTab] = useState("description")
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [leftPanelWidth, setLeftPanelWidth] = useState(50)
+  const [showSettings, setShowSettings] = useState(false)
 
-  // Track window resize
-  useEffect(() => {
-    const handleResize = () => {
-      setWindowWidth(window.innerWidth)
-      calculateEditorHeight()
+  // Results state
+  const [testResults, setTestResults] = useState([])
+  const [submissionHistory, setSubmissionHistory] = useState([])
+  const [currentTestCase, setCurrentTestCase] = useState(0)
+
+  // Editor settings
+  const [editorSettings, setEditorSettings] = useState({
+    fontSize: 14,
+    theme: "vs-dark",
+    wordWrap: "on",
+    minimap: false,
+  })
+
+  // Language configurations
+  const languages = {
+    javascript: {
+      name: "JavaScript",
+      template: `function solution() {
+    // Write your solution here
+    
+}
+
+// Test your solution
+console.log(solution());`,
+      extension: "js",
+    },
+    python: {
+      name: "Python",
+      template: `def solution():
+    # Write your solution here
+    pass
+
+# Test your solution
+print(solution())`,
+      extension: "py",
+    },
+    java: {
+      name: "Java",
+      template: `public class Solution {
+    public static void main(String[] args) {
+        Solution sol = new Solution();
+        // Test your solution
+        System.out.println(sol.solution());
     }
     
-    window.addEventListener("resize", handleResize)
-    return () => window.removeEventListener("resize", handleResize)
-  }, [])
-
-  // Calculate editor height based on window size and other elements
-  const calculateEditorHeight = () => {
-    if (!containerRef.current) return
-
-    const viewportHeight = window.innerHeight
-    const containerTop = containerRef.current.getBoundingClientRect().top
-    const toolbarHeight = 48
-    const outputAreaHeight = runOutput ? outputHeight : 0
-    const footerHeight = 60
-    const padding = 16
-
-    // Calculate available height
-    let calculatedHeight
-    
-    if (isFullScreenEditor) {
-      calculatedHeight = viewportHeight - toolbarHeight - outputAreaHeight - padding
-    } else {
-      calculatedHeight = viewportHeight - containerTop - toolbarHeight - outputAreaHeight - footerHeight - padding
+    public int solution() {
+        // Write your solution here
+        return 0;
     }
-    
-    // Set minimum height
-    calculatedHeight = Math.max(300, calculatedHeight)
-    setEditorHeight(`${calculatedHeight}px`)
+}`,
+      extension: "java",
+    },
+    cpp: {
+      name: "C++",
+      template: `#include <iostream>
+#include <vector>
+#include <string>
+using namespace std;
+
+class Solution {
+public:
+    int solution() {
+        // Write your solution here
+        return 0;
+    }
+};
+
+int main() {
+    Solution sol;
+    // Test your solution
+    cout << sol.solution() << endl;
+    return 0;
+}`,
+      extension: "cpp",
+    },
   }
 
+  // Load problem data
   useEffect(() => {
-    calculateEditorHeight()
-  }, [runOutput, isFullScreenEditor, windowWidth])
-
-  // Fetch problem data
-  useEffect(() => {
-    const fetchProblemData = async () => {
+    const fetchProblem = async () => {
       try {
-        setLoading(true)
-        setError(null)
-
+        setIsLoading(true)
         const response = await api.get(`/practice/problems/${problemId}`)
-        const { problem, isSolved, submissions } = response.data
+        console.log("response",response);
+        setProblem(response.data.problem)
 
-        setProblem(problem)
-        setIsSolved(isSolved)
-        setSubmissions(submissions)
-
-        // Set initial code from starter code or from previous submission
-        const userSubmission = submissions.find((sub) => sub.language === language)
-
-        if (userSubmission) {
-          setCode(userSubmission.code)
-        } else if (problem.starterCode && problem.starterCode[language]) {
-          setCode(problem.starterCode[language])
+        // Load saved code or use template
+        const savedCode = localStorage.getItem(`practice_${problemId}_${language}`)
+        if (savedCode) {
+          setCode(savedCode)
+        } else {
+          setCode(languages[language].template)
         }
 
-        setLoading(false)
+        // Load submission history
+        const historyResponse = await api.get(`/practice/problems/${problemId}/submissions`)
+        setSubmissionHistory(historyResponse.data.submissions || [])
       } catch (error) {
-        console.error("Error fetching problem data:", error)
-        setError("Failed to load problem data. Please try again.")
-        setLoading(false)
+        console.error("Error fetching problem:", error)
+        toast.error("Failed to load problem")
+        navigate("/practice")
+      } finally {
+        setIsLoading(false)
       }
     }
 
     if (problemId) {
-      fetchProblemData()
+      fetchProblem()
     }
-  }, [problemId, language])
+  }, [problemId, navigate])
 
-  // Handle editor mount
-  const handleEditorDidMount = (editor, monaco) => {
-    editorRef.current = editor
-    calculateEditorHeight()
+  // Save code to localStorage when it changes
+  useEffect(() => {
+    if (code && problemId) {
+      localStorage.setItem(`practice_${problemId}_${language}`, code)
+    }
+  }, [code, language, problemId])
+
+  // Handle language change
+  const handleLanguageChange = (newLanguage) => {
+    // Save current code
+    if (code && problemId) {
+      localStorage.setItem(`practice_${problemId}_${language}`, code)
+    }
+
+    setLanguage(newLanguage)
+
+    // Load saved code for new language or use template
+    const savedCode = localStorage.getItem(`practice_${problemId}_${newLanguage}`)
+    if (savedCode) {
+      setCode(savedCode)
+    } else {
+      setCode(languages[newLanguage].template)
+    }
   }
 
-  // Run code
-  const runCode = async () => {
-    if (!problemId) return
+  // Run code against sample test cases
+  const handleRunCode = async () => {
+    if (!code.trim()) {
+      toast.error("Please write some code first")
+      return
+    }
 
     setIsRunning(true)
-    setRunOutput("Running code...")
-
     try {
       const response = await api.post(`/practice/problems/${problemId}/run`, {
         code,
         language,
-        testCaseIndex: 0, // Run first test case
+        testCaseIndex: currentTestCase,
       })
 
-      const result = response.data.result
+      setTestResults([response.data.result])
+      setActiveTab("output")
 
-      // Format output
-      const formattedOutput = `Test Case:
-Input: ${result.input}
-Expected Output: ${result.expectedOutput}
-Your Output: ${result.actualOutput}
-Result: ${result.passed ? "✅ Passed" : "❌ Failed"}
-${result.error ? `\nError: ${result.error}` : ""}
-`
-
-      setRunOutput(formattedOutput)
+      if (response.data.result.passed) {
+        toast.success("Test case passed!")
+      } else {
+        toast.error("Test case failed")
+      }
     } catch (error) {
       console.error("Error running code:", error)
-      setRunOutput(`Error running code: ${error.response?.data?.message || "Unknown error"}`)
+      toast.error("Failed to run code")
     } finally {
       setIsRunning(false)
     }
   }
 
   // Submit solution
-  const submitSolution = async () => {
-    if (!problemId) return
+  const handleSubmit = async () => {
+    if (!code.trim()) {
+      toast.error("Please write some code first")
+      return
+    }
 
     setIsSubmitting(true)
-
     try {
       const response = await api.post(`/practice/problems/${problemId}/submit`, {
         code,
         language,
       })
 
-      const { isCorrect, results } = response.data
+      setTestResults(response.data.results)
+      setActiveTab("output")
 
-      if (isCorrect) {
-        toast.success("Your solution is correct!")
-        setIsSolved(true)
-
-        // Add to submissions
-        setSubmissions([
-          {
-            code,
-            language,
-            isCorrect,
-            submittedAt: new Date(),
-          },
-          ...submissions,
-        ])
+      if (response.data.isCorrect) {
+        toast.success("🎉 Congratulations! All test cases passed!")
+        // Refresh submission history
+        const historyResponse = await api.get(`/practice/problems/${problemId}/submissions`)
+        setSubmissionHistory(historyResponse.data.submissions || [])
       } else {
-        toast.error("Your solution is incorrect. Please try again.")
-
-        // Format results for display
-        let formattedOutput = "Submission Results:\n\n"
-        results.forEach((result, index) => {
-          formattedOutput += `Test Case ${index + 1}:
-Input: ${result.input}
-Expected Output: ${result.expectedOutput}
-Your Output: ${result.actualOutput}
-Result: ${result.passed ? "✅ Passed" : "❌ Failed"}
-${result.error ? `Error: ${result.error}` : ""}
-\n`
-        })
-
-        setRunOutput(formattedOutput)
+        const passedCount = response.data.results.filter((r) => r.passed).length
+        toast.error(`${passedCount}/${response.data.results.length} test cases passed`)
       }
     } catch (error) {
-      console.error("Error submitting solution:", error)
-      toast.error(`Submission error: ${error.response?.data?.message || "Unknown error"}`)
+      console.error("Error submitting code:", error)
+      toast.error("Failed to submit solution")
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  // Toggle fullscreen editor
-  const toggleFullScreen = () => {
-    setIsFullScreenEditor(!isFullScreenEditor)
+  // Reset code to template
+  const handleReset = () => {
+    if (window.confirm("Are you sure you want to reset your code? This action cannot be undone.")) {
+      setCode(languages[language].template)
+      localStorage.removeItem(`practice_${problemId}_${language}`)
+    }
   }
 
-  // Resize output area
-  const handleResizeOutput = (newHeight) => {
-    setOutputHeight(newHeight)
-    calculateEditorHeight()
+  // Toggle fullscreen
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen)
   }
 
-  // Format date
-  const formatDate = (dateString) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
+  // Handle panel resize
+  const handleMouseDown = (e) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startWidth = leftPanelWidth
+
+    const handleMouseMove = (e) => {
+      const deltaX = e.clientX - startX
+      const containerWidth = window.innerWidth
+      const newWidth = Math.min(Math.max(20, startWidth + (deltaX / containerWidth) * 100), 80)
+      setLeftPanelWidth(newWidth)
+    }
+
+    const handleMouseUp = () => {
+      document.removeEventListener("mousemove", handleMouseMove)
+      document.removeEventListener("mouseup", handleMouseUp)
+    }
+
+    document.addEventListener("mousemove", handleMouseMove)
+    document.addEventListener("mouseup", handleMouseUp)
   }
 
-  // Loading state
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-900 text-white">
-        <Navbar />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
-        </div>
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
       </div>
     )
   }
 
-  // Error state
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-900 text-white">
-        <Navbar />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="bg-gray-800 rounded-lg shadow-lg p-8 text-center">
-            <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold mb-4">Error</h2>
-            <p className="text-gray-400 mb-6">{error}</p>
-            <button
-              onClick={() => navigate("/practice")}
-              className="px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-md font-medium transition-colors"
-            >
-              Return to Practice
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // No problem data
   if (!problem) {
     return (
-      <div className="min-h-screen bg-gray-900 text-white">
-        <Navbar />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-4">Problem Not Found</h2>
+          <button
+            onClick={() => navigate("/practice")}
+            className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-md transition-colors"
+          >
+            Back to Practice
+          </button>
         </div>
       </div>
     )
+  }
+
+  const getDifficultyColor = (difficulty) => {
+    switch (difficulty) {
+      case "Easy":
+        return "text-green-400 bg-green-900/20"
+      case "Medium":
+        return "text-yellow-400 bg-yellow-900/20"
+      case "Hard":
+        return "text-red-400 bg-red-900/20"
+      default:
+        return "text-gray-400 bg-gray-900/20"
+    }
   }
 
   return (
-    <div className={`min-h-screen bg-gray-900 text-white flex flex-col ${isFullScreenEditor ? 'overflow-hidden' : ''}`}>
-      {!isFullScreenEditor && <Navbar />}
+    <div className={`bg-gray-900 text-white ${isFullscreen ? "fixed inset-0 z-50" : "min-h-screen"}`}>
+      <Navbar />
+      {/* Header */}
+      <div className="bg-gray-800 border-b border-gray-700 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={() => navigate("/practice")}
+            className="flex items-center text-gray-400 hover:text-white transition-colors"
+          >
+            <ArrowLeft className="h-5 w-5 mr-2" />
+            Back to Practice
+          </button>
+          <div className="h-6 w-px bg-gray-600"></div>
+          <h1 className="text-lg font-semibold">{problem.title}</h1>
+          <span className={`px-2 py-1 text-xs rounded-full ${getDifficultyColor(problem.difficulty)}`}>
+            {problem.difficulty}
+          </span>
+        </div>
 
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <div className="bg-gray-800 border-b border-gray-700 py-2 sm:py-4 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div className="flex items-center">
-              <Link to="/practice" className="text-gray-400 hover:text-white mr-4">
-                <ArrowLeft className="h-5 w-5" />
-              </Link>
-              <div>
-                <h1 className="text-lg sm:text-xl font-bold flex items-center">
-                  {problem.title}
-                  {isSolved && <CheckCircle className="ml-2 h-5 w-5 text-green-500" />}
-                </h1>
-                <div className="flex flex-wrap items-center mt-1 gap-2">
-                  <span
-                    className={`px-2 py-0.5 text-xs rounded-full ${
-                      problem.difficulty === "Easy"
-                        ? "bg-green-900 bg-opacity-20 text-green-500"
-                        : problem.difficulty === "Medium"
-                          ? "bg-yellow-900 bg-opacity-20 text-yellow-500"
-                          : "bg-red-900 bg-opacity-20 text-red-500"
-                    }`}
-                  >
-                    {problem.difficulty}
-                  </span>
-                  {problem.tags &&
-                    problem.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-700 text-gray-300"
-                      >
-                        <Tag className="h-3 w-3 mr-1" />
-                        {tag}
-                      </span>
-                    ))}
-                </div>
-              </div>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-md transition-colors"
+          >
+            <Settings className="h-5 w-5" />
+          </button>
+          <button
+            onClick={toggleFullscreen}
+            className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-md transition-colors"
+          >
+            {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Settings Panel */}
+      {showSettings && (
+        <div className="bg-gray-800 border-b border-gray-700 px-4 py-3">
+          <div className="flex items-center space-x-6">
+            <div className="flex items-center space-x-2">
+              <label className="text-sm text-gray-400">Font Size:</label>
+              <select
+                value={editorSettings.fontSize}
+                onChange={(e) => setEditorSettings((prev) => ({ ...prev, fontSize: Number.parseInt(e.target.value) }))}
+                className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm"
+              >
+                <option value={12}>12px</option>
+                <option value={14}>14px</option>
+                <option value={16}>16px</option>
+                <option value={18}>18px</option>
+                <option value={20}>20px</option>
+              </select>
             </div>
-
-            <div className="flex items-center space-x-2 mt-2 sm:mt-0">
-              <div className="text-xs sm:text-sm text-gray-400">
-                <span className="font-medium text-white">{problem.solvedCount || 0}</span> solved
-              </div>
-              
-              {/* Mobile tabs buttons */}
-              <div className="sm:hidden flex items-center gap-2 ml-auto">
-                <button
-                  onClick={() => setActiveTab("description")}
-                  className={`px-3 py-1 rounded-md text-sm flex items-center ${
-                    activeTab === "description" ? "bg-purple-600" : "bg-gray-700"
-                  }`}
-                >
-                  <FileText className="h-4 w-4 mr-1" />
-                  Problem
-                </button>
-                <button
-                  onClick={() => setActiveTab("editor")}
-                  className={`px-3 py-1 rounded-md text-sm flex items-center ${
-                    activeTab === "editor" ? "bg-purple-600" : "bg-gray-700"
-                  }`}
-                >
-                  <Code className="h-4 w-4 mr-1" />
-                  Code
-                </button>
-              </div>
+            <div className="flex items-center space-x-2">
+              <label className="text-sm text-gray-400">Theme:</label>
+              <select
+                value={editorSettings.theme}
+                onChange={(e) => setEditorSettings((prev) => ({ ...prev, theme: e.target.value }))}
+                className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm"
+              >
+                <option value="vs-dark">Dark</option>
+                <option value="light">Light</option>
+                <option value="hc-black">High Contrast</option>
+              </select>
+            </div>
+            <div className="flex items-center space-x-2">
+              <label className="text-sm text-gray-400">Word Wrap:</label>
+              <select
+                value={editorSettings.wordWrap}
+                onChange={(e) => setEditorSettings((prev) => ({ ...prev, wordWrap: e.target.value }))}
+                className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm"
+              >
+                <option value="off">Off</option>
+                <option value="on">On</option>
+                <option value="wordWrapColumn">Column</option>
+              </select>
             </div>
           </div>
         </div>
+      )}
 
-        <div className="flex-1 flex flex-col md:flex-row">
-          {/* Problem Description - Show on mobile only when activeTab is description */}
-          <div
-            className={`${
-              windowWidth < 768 
-                ? activeTab === "description" ? "block" : "hidden" 
-                : "block"
-            } w-full md:w-2/5 lg:w-1/3 bg-gray-800 overflow-y-auto border-b md:border-b-0 md:border-r border-gray-700`}
-          >
-            <div className="p-4">
-              <div className="prose prose-invert max-w-none">
-                <div className="whitespace-pre-line">{problem.description}</div>
+      {/* Main Content */}
+      <div className="flex h-full" style={{ height: isFullscreen ? "calc(100vh - 120px)" : "calc(100vh - 120px)" }}>
+        {/* Left Panel - Problem Description */}
+        <div
+          className="bg-gray-800 border-r border-gray-700 overflow-hidden flex flex-col"
+          style={{ width: `${leftPanelWidth}%` }}
+        >
+          {/* Tabs */}
+          <div className="flex border-b border-gray-700">
+            <button
+              onClick={() => setActiveTab("description")}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === "description"
+                  ? "border-purple-500 text-purple-400"
+                  : "border-transparent text-gray-400 hover:text-white"
+              }`}
+            >
+              Description
+            </button>
+            <button
+              onClick={() => setActiveTab("output")}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === "output"
+                  ? "border-purple-500 text-purple-400"
+                  : "border-transparent text-gray-400 hover:text-white"
+              }`}
+            >
+              Output{" "}
+              {testResults.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 bg-purple-600 text-white text-xs rounded-full">
+                  {testResults.filter((r) => r.passed).length}/{testResults.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab("submissions")}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === "submissions"
+                  ? "border-purple-500 text-purple-400"
+                  : "border-transparent text-gray-400 hover:text-white"
+              }`}
+            >
+              Submissions ({submissionHistory.length})
+            </button>
+          </div>
 
-                {problem.testCases && problem.testCases.length > 0 && (
-                  <div className="mt-6">
-                    <h3 className="text-lg font-semibold mb-2">Example Test Cases</h3>
-                    {problem.testCases
-                      .filter((tc) => !tc.isHidden)
-                      .map((testCase, index) => (
-                        <div key={index} className="mb-4 p-3 bg-gray-700 rounded-md overflow-x-auto">
-                          <div className="mb-1">
-                            <strong>Input:</strong> {testCase.input}
-                          </div>
-                          <div>
-                            <strong>Output:</strong> {testCase.output}
-                          </div>
+          {/* Tab Content */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {activeTab === "description" && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-xl font-bold mb-4">{problem.title}</h2>
+                  <div className="prose prose-invert max-w-none">
+                    <div className="whitespace-pre-wrap text-gray-300 leading-relaxed">{problem.description}</div>
+                  </div>
+                </div>
+
+                {problem.examples && problem.examples.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3">Examples</h3>
+                    {problem.examples.map((example, index) => (
+                      <div key={index} className="bg-gray-900 rounded-lg p-4 mb-4">
+                        <div className="mb-2">
+                          <span className="text-sm font-medium text-gray-400">Input:</span>
+                          <pre className="mt-1 text-sm bg-gray-800 p-2 rounded overflow-x-auto">{example.input}</pre>
                         </div>
-                      ))}
+                        <div className="mb-2">
+                          <span className="text-sm font-medium text-gray-400">Output:</span>
+                          <pre className="mt-1 text-sm bg-gray-800 p-2 rounded overflow-x-auto">{example.output}</pre>
+                        </div>
+                        {example.explanation && (
+                          <div>
+                            <span className="text-sm font-medium text-gray-400">Explanation:</span>
+                            <p className="mt-1 text-sm text-gray-300">{example.explanation}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
 
-                {submissions.length > 0 && (
-                  <div className="mt-6">
-                    <h3 className="text-lg font-semibold mb-2">Your Submissions</h3>
-                    <div className="space-y-2">
-                      {submissions.slice(0, 5).map((submission, index) => (
-                        <div
-                          key={index}
-                          className={`p-3 rounded-md ${
-                            submission.isCorrect ? "bg-green-900 bg-opacity-20" : "bg-red-900 bg-opacity-20"
-                          }`}
-                        >
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex items-center">
-                              {submission.isCorrect ? (
-                                <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                              ) : (
-                                <XCircle className="h-4 w-4 text-red-500 mr-2" />
-                              )}
-                              <span className="text-sm">
-                                {submission.language.charAt(0).toUpperCase() + submission.language.slice(1)}
-                              </span>
-                            </div>
-                            <span className="text-xs text-gray-400">{formatDate(submission.submittedAt)}</span>
-                          </div>
-                          <button
-                            onClick={() => {
-                              setLanguage(submission.language)
-                              setCode(submission.code)
-                              if (windowWidth < 768) {
-                                setActiveTab("editor")
-                              }
-                            }}
-                            className="mt-2 text-xs text-purple-400 hover:text-purple-300"
-                          >
-                            Load this submission
-                          </button>
-                        </div>
-                      ))}
-                      {submissions.length > 5 && (
-                        <div className="text-center text-sm text-gray-400">
-                          + {submissions.length - 5} more submissions
-                        </div>
-                      )}
+                {problem.constraints && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3">Constraints</h3>
+                    <div className="bg-gray-900 rounded-lg p-4">
+                      <pre className="text-sm text-gray-300 whitespace-pre-wrap">{problem.constraints}</pre>
                     </div>
                   </div>
                 )}
-              </div>
-            </div>
-          </div>
 
-          {/* Code Editor - Show on mobile only when activeTab is editor */}
-          <div 
-            ref={containerRef}
-            className={`${
-              windowWidth < 768 
-                ? activeTab === "editor" ? "flex" : "hidden" 
-                : "flex"
-            } flex-1 flex-col relative ${isFullScreenEditor ? 'fixed inset-0 z-50 bg-gray-900' : ''}`}
-          >
-            <div className="bg-gray-800 border-b border-gray-700 p-2 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center space-x-2">
-                <select
-                  value={language}
-                  onChange={(e) => {
-                    setLanguage(e.target.value)
-                    // Check if there's a submission for this language
-                    const submission = submissions.find((sub) => sub.language === e.target.value)
-                    if (submission) {
-                      setCode(submission.code)
-                    } else if (problem.starterCode && problem.starterCode[e.target.value]) {
-                      setCode(problem.starterCode[e.target.value])
-                    }
-                  }}
-                  className="bg-gray-700 text-white border border-gray-600 rounded px-2 py-1 text-xs sm:text-sm"
-                >
-                  <option value="javascript">JavaScript</option>
-                  <option value="python">Python</option>
-                  <option value="java">Java</option>
-                </select>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={runCode}
-                  disabled={isRunning}
-                  className="flex items-center px-2 sm:px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-xs sm:text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Play className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                  <span className="hidden xs:inline">Run</span>
-                </button>
-
-                <button
-                  onClick={submitSolution}
-                  disabled={isSubmitting}
-                  className="flex items-center px-2 sm:px-3 py-1 bg-purple-600 hover:bg-purple-700 rounded text-xs sm:text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Send className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                  <span className="hidden xs:inline">Submit</span>
-                </button>
-
-                <button
-                  onClick={toggleFullScreen}
-                  className="flex items-center px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs sm:text-sm"
-                >
-                  {isFullScreenEditor ? (
-                    <Minimize2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                  ) : (
-                    <Maximize2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex-1 relative">
-              <Editor
-                height={editorHeight}
-                language={language}
-                value={code}
-                onChange={setCode}
-                theme="vs-dark"
-                options={{
-                  minimap: { enabled: windowWidth >= 768 },
-                  fontSize: windowWidth < 640 ? 12 : 14,
-                  scrollBeyondLastLine: false,
-                  automaticLayout: true,
-                  wordWrap: windowWidth < 768 ? 'on' : 'off',
-                  lineNumbers: windowWidth >= 480 ? 'on' : 'off',
-                }}
-                onMount={handleEditorDidMount}
-              />
-            </div>
-
-            {runOutput && (
-              <div 
-                className="bg-gray-800 border-t border-gray-700 p-4 font-mono text-xs sm:text-sm overflow-y-auto"
-                style={{ height: `${outputHeight}px` }}
-              >
-                <div className="flex justify-between items-center mb-2">
-                  <div className="font-semibold">Output</div>
-                  <div className="flex space-x-2">
-                    <button 
-                      onClick={() => handleResizeOutput(Math.max(100, outputHeight - 50))}
-                      className="text-gray-400 hover:text-white"
-                    >
-                      <ChevronDown className="h-4 w-4" />
-                    </button>
-                    <button 
-                      onClick={() => handleResizeOutput(Math.min(400, outputHeight + 50))}
-                      className="text-gray-400 hover:text-white"
-                    >
-                      <ChevronUp className="h-4 w-4" />
-                    </button>
+                {problem.hints && problem.hints.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3 flex items-center">
+                      <Lightbulb className="h-5 w-5 mr-2 text-yellow-400" />
+                      Hints
+                    </h3>
+                    {problem.hints.map((hint, index) => (
+                      <div key={index} className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-4 mb-2">
+                        <p className="text-sm text-yellow-200">{hint}</p>
+                      </div>
+                    ))}
                   </div>
-                </div>
-                <pre className="whitespace-pre-wrap overflow-x-auto">{runOutput}</pre>
+                )}
+              </div>
+            )}
+
+            {activeTab === "output" && (
+              <div className="space-y-4">
+                {testResults.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Code2 className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+                    <p className="text-gray-400">Run your code to see the output</p>
+                  </div>
+                ) : (
+                  testResults.map((result, index) => (
+                    <div key={index} className="bg-gray-900 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium">Test Case {index + 1}</h4>
+                        <div className="flex items-center">
+                          {result.passed ? (
+                            <CheckCircle className="h-5 w-5 text-green-400" />
+                          ) : (
+                            <XCircle className="h-5 w-5 text-red-400" />
+                          )}
+                          <span className={`ml-2 text-sm ${result.passed ? "text-green-400" : "text-red-400"}`}>
+                            {result.passed ? "Passed" : "Failed"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div>
+                          <span className="text-sm font-medium text-gray-400">Input:</span>
+                          <pre className="mt-1 text-sm bg-gray-800 p-2 rounded overflow-x-auto">{result.input}</pre>
+                        </div>
+                        <div>
+                          <span className="text-sm font-medium text-gray-400">Expected Output:</span>
+                          <pre className="mt-1 text-sm bg-gray-800 p-2 rounded overflow-x-auto">
+                            {result.expectedOutput}
+                          </pre>
+                        </div>
+                        <div>
+                          <span className="text-sm font-medium text-gray-400">Your Output:</span>
+                          <pre
+                            className={`mt-1 text-sm p-2 rounded overflow-x-auto ${
+                              result.passed
+                                ? "bg-green-900/20 border border-green-700"
+                                : "bg-red-900/20 border border-red-700"
+                            }`}
+                          >
+                            {result.actualOutput || "No output"}
+                          </pre>
+                        </div>
+                        {result.stderr && (
+                          <div>
+                            <span className="text-sm font-medium text-red-400">Error:</span>
+                            <pre className="mt-1 text-sm bg-red-900/20 border border-red-700 p-2 rounded overflow-x-auto">
+                              {result.stderr}
+                            </pre>
+                          </div>
+                        )}
+                        {result.executionTime && (
+                          <div className="flex items-center text-sm text-gray-400">
+                            <Clock className="h-4 w-4 mr-1" />
+                            Execution Time: {result.executionTime}ms
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {activeTab === "submissions" && (
+              <div className="space-y-4">
+                {submissionHistory.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Send className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+                    <p className="text-gray-400">No submissions yet</p>
+                  </div>
+                ) : (
+                  submissionHistory.map((submission, index) => (
+                    <div key={index} className="bg-gray-900 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center space-x-3">
+                          <span
+                            className={`px-2 py-1 text-xs rounded-full ${
+                              submission.status === "Accepted"
+                                ? "bg-green-900/20 text-green-400"
+                                : "bg-red-900/20 text-red-400"
+                            }`}
+                          >
+                            {submission.status}
+                          </span>
+                          <span className="text-sm text-gray-400">{submission.language}</span>
+                        </div>
+                        <span className="text-sm text-gray-400">
+                          {new Date(submission.submittedAt).toLocaleString()}
+                        </span>
+                      </div>
+                      {submission.executionTime && (
+                        <div className="text-sm text-gray-400">Runtime: {submission.executionTime}ms</div>
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
             )}
           </div>
         </div>
-      </div>
 
-      {!isFullScreenEditor && <Footer />}
+        {/* Resize Handle */}
+        <div
+          className="w-1 bg-gray-700 hover:bg-purple-500 cursor-col-resize transition-colors"
+          onMouseDown={handleMouseDown}
+        />
+
+        {/* Right Panel - Code Editor */}
+        <div className="flex-1 flex flex-col bg-gray-900">
+          {/* Editor Header */}
+          <div className="bg-gray-800 border-b border-gray-700 px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <select
+                value={language}
+                onChange={(e) => handleLanguageChange(e.target.value)}
+                className="bg-gray-700 border border-gray-600 rounded px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                {Object.entries(languages).map(([key, lang]) => (
+                  <option key={key} value={key}>
+                    {lang.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handleReset}
+                className="flex items-center px-3 py-1 text-sm text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
+              >
+                <RotateCcw className="h-4 w-4 mr-1" />
+                Reset
+              </button>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleRunCode}
+                disabled={isRunning}
+                className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-800 text-white rounded-md transition-colors"
+              >
+                <Play className="h-4 w-4 mr-2" />
+                {isRunning ? "Running..." : "Run"}
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-800 text-white rounded-md transition-colors"
+              >
+                <Send className="h-4 w-4 mr-2" />
+                {isSubmitting ? "Submitting..." : "Submit"}
+              </button>
+            </div>
+          </div>
+
+          {/* Code Editor */}
+          <div className="flex-1">
+            <Editor
+              height="100%"
+              language={language}
+              value={code}
+              onChange={setCode}
+              theme={editorSettings.theme}
+              onMount={(editor) => {
+                editorRef.current = editor
+              }}
+              options={{
+                fontSize: editorSettings.fontSize,
+                wordWrap: editorSettings.wordWrap,
+                minimap: { enabled: editorSettings.minimap },
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+                tabSize: 2,
+                insertSpaces: true,
+                renderWhitespace: "selection",
+                bracketPairColorization: { enabled: true },
+                guides: {
+                  bracketPairs: true,
+                  indentation: true,
+                },
+                suggestOnTriggerCharacters: true,
+                acceptSuggestionOnEnter: "on",
+                quickSuggestions: true,
+              }}
+            />
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
