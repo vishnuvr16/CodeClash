@@ -73,7 +73,7 @@ const DuelPage = () => {
       setLoading(true)
       setError(null)
 
-      const response = await api.get(`/matches/${matchId}`)
+      const response = await api.get(`/match/${matchId}`)
       const matchData = response.data
 
       setMatch(matchData)
@@ -410,7 +410,7 @@ const DuelPage = () => {
     setIsConceding(true)
 
     try {
-      await api.post(`/matches/${matchId}/concede`)
+      await api.post(`/match/${matchId}/concede`)
       toast.info("You have conceded the match")
       setMatchStatus("completed")
       navigate(`/result/${matchId}`)
