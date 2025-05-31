@@ -379,7 +379,7 @@ const DuelPage = () => {
     setOpponentStatus("submitted")
 
     try {
-      const response = await api.post(`/matches/${matchId}/submit`, {
+      const response = await api.post(`/match/${matchId}/submit`, {
         code,
         language,
       })
