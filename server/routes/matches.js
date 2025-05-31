@@ -3,8 +3,8 @@ const router = express.Router()
 const mongoose = require("mongoose")
 const Match = require("../models/Match")
 const User = require("../models/User")
-const { calculateNewRatings } = require("../utils/elo")
 const { authenticateToken } = require("../middleware/auth")
+const { calculateNewRatings } = require("../utils/elo")
 
 // Route to create a new match
 router.post("/",authenticateToken, async (req, res) => {
