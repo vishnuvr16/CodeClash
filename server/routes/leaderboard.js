@@ -12,39 +12,44 @@ router.get("/", async (req, res) => {
     // Base query
     const query = {}
 
-    // Apply timeframe filter if specified
-    // In a real app, you would filter based on matches within the timeframe
-    // For demo purposes, we'll just use the current ratings
-
-    // Get users sorted by rating
-    const users = await User.find(query)
-      .select("username rating totalMatches wins losses")
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .sort({ rating: -1 })
+    // Get users sorted by rating with proper win rate calculation
+    const users = await User.aggregate([
+      { $match: query },
+      {
+        $addFields: {
+          winRate: {
+            $cond: {
+              if: { $eq: ["$totalMatches", 0] },
+              then: 0,
+              else: {
+                $round: [{ $multiply: [{ $divide: ["$wins", "$totalMatches"] }, 100] }, 1],
+              },
+            },
+          },
+        },
+      },
+      { $sort: { rating: -1 } },
+      { $skip: (page - 1) * limit },
+      { $limit: Number.parseInt(limit) },
+      {
+        $project: {
+          username: 1,
+          rating: 1,
+          totalMatches: 1,
+          wins: 1,
+          losses: 1,
+          winRate: 1,
+        },
+      },
+    ])
 
     // Get total count
     const count = await User.countDocuments(query)
 
-    // Calculate win rates and format response
-    const formattedUsers = users.map((user) => {
-      const winRate = user.totalMatches > 0 ? Math.round((user.wins / user.totalMatches) * 100) : 0
-
-      return {
-        id: user._id,
-        username: user.username,
-        rating: user.rating,
-        totalMatches: user.totalMatches,
-        wins: user.wins,
-        losses: user.losses,
-        winRate,
-      }
-    })
-
     res.status(200).json({
-      users: formattedUsers,
+      users,
       totalPages: Math.ceil(count / limit),
-      currentPage: page,
+      currentPage: Number.parseInt(page),
       totalUsers: count,
     })
   } catch (error) {

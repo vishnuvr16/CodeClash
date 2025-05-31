@@ -19,7 +19,6 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
       required: function () {
-        // Password is required only if googleId is not provided
         return !this.googleId
       },
     },
@@ -35,47 +34,28 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 1200,
     },
-    matchesPlayed: {
+    totalMatches: {
       type: Number,
       default: 0,
     },
-    matchesWon: {
+    wins: {
       type: Number,
       default: 0,
     },
-    matchesLost: {
+    losses: {
       type: Number,
       default: 0,
     },
-    matchesTied: {
-      type: Number,
-      default: 0,
-    },
-    solvedProblems: [
+    matchHistory: [
       {
-        problemId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Problem",
-        },
-        solvedAt: {
-          type: Date,
-          default: Date.now,
-        },
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Match",
       },
     ],
-    submissions: [
+    solvedProblems: [
       {
-        problemId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Problem",
-        },
-        code: String,
-        language: String,
-        status: String,
-        submittedAt: {
-          type: Date,
-          default: Date.now,
-        },
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Problem",
       },
     ],
   },

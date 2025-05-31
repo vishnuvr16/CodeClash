@@ -219,44 +219,36 @@ router.post("/:id/submit", authenticateToken, async (req, res) => {
 router.post("/:id/concede", authenticateToken, async (req, res) => {
   try {
     const userId = req.user._id
-
-    // Find match
     const match = await Match.findById(req.params.id)
+      .populate("userA", "rating totalMatches wins losses")
+      .populate("userB", "rating totalMatches wins losses")
 
     if (!match) {
-      return res.status(404).json({
-        message: "Match not found",
-      })
+      return res.status(404).json({ message: "Match not found" })
     }
 
     // Check if user is part of the match
-    if (match.userA.toString() !== userId.toString() && match.userB.toString() !== userId.toString()) {
-      return res.status(403).json({
-        message: "You are not authorized to concede this match",
-      })
+    if (match.userA._id.toString() !== userId.toString() && match.userB._id.toString() !== userId.toString()) {
+      return res.status(403).json({ message: "You are not authorized to concede this match" })
     }
 
     // Check if match is active or pending
     if (match.status !== "active" && match.status !== "pending") {
-      return res.status(400).json({
-        message: "Match is not active",
-      })
+      return res.status(400).json({ message: "Match is not active" })
     }
 
     // Set the opponent as the winner
-    const isUserA = match.userA.toString() === userId.toString()
-    match.winner = isUserA ? match.userB : match.userA
+    const isUserA = match.userA._id.toString() === userId.toString()
+    match.winner = isUserA ? match.userB._id : match.userA._id
     match.endTime = new Date()
     match.status = "completed"
     match.concedeBy = userId
 
     // Calculate rating changes
-    const [userA, userB] = await Promise.all([User.findById(match.userA), User.findById(match.userB)])
-
     const { ratingChangeA, ratingChangeB } = calculateRatingChanges(
-      userA.rating,
-      userB.rating,
-      match.winner.toString() === match.userA.toString(),
+      match.userA.rating,
+      match.userB.rating,
+      match.winner.toString() === match.userA._id.toString(),
     )
 
     match.ratingChangeA = ratingChangeA
@@ -264,20 +256,20 @@ router.post("/:id/concede", authenticateToken, async (req, res) => {
 
     // Update user ratings and stats
     await Promise.all([
-      User.findByIdAndUpdate(match.userA, {
+      User.findByIdAndUpdate(match.userA._id, {
         $inc: {
           rating: ratingChangeA,
           totalMatches: 1,
-          wins: match.winner.toString() === match.userA.toString() ? 1 : 0,
-          losses: match.winner.toString() === match.userA.toString() ? 0 : 1,
+          wins: match.winner.toString() === match.userA._id.toString() ? 1 : 0,
+          losses: match.winner.toString() === match.userA._id.toString() ? 0 : 1,
         },
       }),
-      User.findByIdAndUpdate(match.userB, {
+      User.findByIdAndUpdate(match.userB._id, {
         $inc: {
           rating: ratingChangeB,
           totalMatches: 1,
-          wins: match.winner.toString() === match.userB.toString() ? 1 : 0,
-          losses: match.winner.toString() === match.userB.toString() ? 0 : 1,
+          wins: match.winner.toString() === match.userB._id.toString() ? 1 : 0,
+          losses: match.winner.toString() === match.userB._id.toString() ? 0 : 1,
         },
       }),
     ])
@@ -287,17 +279,17 @@ router.post("/:id/concede", authenticateToken, async (req, res) => {
     res.status(200).json({
       message: "Match conceded successfully",
       match: {
+        id: match._id,
         status: match.status,
         winner: match.winner,
+        concedeBy: match.concedeBy,
         ratingChangeA: match.ratingChangeA,
         ratingChangeB: match.ratingChangeB,
       },
     })
   } catch (error) {
     console.error("Error conceding match:", error)
-    res.status(500).json({
-      message: "Server error while conceding match",
-    })
+    res.status(500).json({ message: "Server error while conceding match" })
   }
 })
 
