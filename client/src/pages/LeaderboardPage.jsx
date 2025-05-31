@@ -53,10 +53,17 @@ const LeaderboardPage = () => {
 
     if (sortConfig.key) {
       sortableItems.sort((a, b) => {
-        if (a[sortConfig.key] < b[sortConfig.key]) {
+        let aValue = a[sortConfig.key]
+        let bValue = b[sortConfig.key]
+
+        // Handle undefined values
+        if (aValue === undefined) aValue = 0
+        if (bValue === undefined) bValue = 0
+
+        if (aValue < bValue) {
           return sortConfig.direction === "asc" ? -1 : 1
         }
-        if (a[sortConfig.key] > b[sortConfig.key]) {
+        if (aValue > bValue) {
           return sortConfig.direction === "asc" ? 1 : -1
         }
         return 0
@@ -264,10 +271,10 @@ const LeaderboardPage = () => {
                           <div className="text-sm font-medium">{user.rating}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm">{user.totalMatches}</div>
+                          <div className="text-sm font-medium">{user.totalMatches || 0}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm">{user.winRate}%</div>
+                          <div className="text-sm">{user.totalMatches > 0 ? `${user.winRate || 0}%` : "0%"}</div>
                         </td>
                       </tr>
                     )
