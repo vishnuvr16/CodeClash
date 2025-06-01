@@ -1,9 +1,8 @@
 const express = require("express")
 const Problem = require("../models/Problem")
 const User = require("../models/User")
-const auth = require("../middleware/auth")
 const { evaluateCode, runCode } = require("../utils/codeEvaluation")
-
+const { authenticateToken } = require("../middleware/auth")
 const router = express.Router()
 
 // Get all practice problems with filtering, sorting, and pagination
@@ -139,7 +138,7 @@ router.get("/problems/:id", async (req, res) => {
 })
 
 // Run code against a single test case (for testing)
-router.post("/problems/:id/run", auth, async (req, res) => {
+router.post("/problems/:id/run", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params
     const { code, language, testCaseIndex = 0 } = req.body
@@ -200,7 +199,7 @@ router.post("/problems/:id/run", auth, async (req, res) => {
 })
 
 // Submit solution for a practice problem
-router.post("/problems/:id/submit", auth, async (req, res) => {
+router.post("/problems/:id/submit", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params
     const { code, language } = req.body
@@ -265,7 +264,7 @@ router.post("/problems/:id/submit", auth, async (req, res) => {
 })
 
 // Get user's practice statistics
-router.get("/stats", auth, async (req, res) => {
+router.get("/stats", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).populate("solvedProblems")
 

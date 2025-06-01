@@ -3,12 +3,11 @@ const router = express.Router()
 const Match = require("../models/Match")
 const User = require("../models/User")
 const Problem = require("../models/Problem")
-const auth = require("../middleware/auth")
 const { evaluateCode, runCode } = require("../utils/codeEvaluation")
 const { updateRating } = require("../utils/ratingSystem")
-
+const { authenticateToken } = require("../middleware/auth")
 // Get match details
-router.get("/:id", auth, async (req, res) => {
+router.get("/:id", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params
 
@@ -23,6 +22,7 @@ router.get("/:id", auth, async (req, res) => {
         message: "Match not found",
       })
     }
+    
 
     // Check if user is part of this match
     const userId = req.user.id
@@ -48,7 +48,7 @@ router.get("/:id", auth, async (req, res) => {
 })
 
 // Run code against a test case
-router.post("/:id/run", auth, async (req, res) => {
+router.post("/:id/run", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params
     const { code, language, testCaseIndex = 0 } = req.body
@@ -126,7 +126,7 @@ router.post("/:id/run", auth, async (req, res) => {
 })
 
 // Submit solution
-router.post("/:id/submit", auth, async (req, res) => {
+router.post("/:id/submit", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params
     const { code, language } = req.body
@@ -242,7 +242,7 @@ router.post("/:id/submit", auth, async (req, res) => {
 })
 
 // Concede match
-router.post("/:id/concede", auth, async (req, res) => {
+router.post("/:id/concede", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params
     const userId = req.user.id
