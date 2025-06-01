@@ -1,3 +1,5 @@
+"use client"
+
 import { useState, useEffect, useRef } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useAuth } from "../contexts/AuthContext"
@@ -15,9 +17,9 @@ import {
   RotateCcw,
   Lightbulb,
   Code2,
+  Info,
 } from "lucide-react"
 import api from "../utils/api"
-import Navbar from "../components/Navbar"
 import { toast } from "react-toastify"
 
 const PracticeProblemPage = () => {
@@ -39,6 +41,7 @@ const PracticeProblemPage = () => {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [leftPanelWidth, setLeftPanelWidth] = useState(50)
   const [showSettings, setShowSettings] = useState(false)
+  const [showInstructions, setShowInstructions] = useState(true)
 
   // Results state
   const [testResults, setTestResults] = useState([])
@@ -57,62 +60,50 @@ const PracticeProblemPage = () => {
   const languages = {
     javascript: {
       name: "JavaScript",
-      template: `function solution() {
-    // Write your solution here
-    
-}
-
-// Test your solution
-console.log(solution());`,
+      template: `function solution(nums) {
+  // Write your solution here
+  // You only need to implement this function
+  // The driver code will be provided automatically
+  
+  return 0; // Replace with your solution
+}`,
       extension: "js",
     },
     python: {
       name: "Python",
-      template: `def solution():
+      template: `def solution(nums):
     # Write your solution here
-    pass
-
-# Test your solution
-print(solution())`,
+    # You only need to implement this function
+    # The driver code will be provided automatically
+    
+    return 0 # Replace with your solution`,
       extension: "py",
     },
     java: {
       name: "Java",
-      template: `public class Solution {
-    public static void main(String[] args) {
-        Solution sol = new Solution();
-        // Test your solution
-        System.out.println(sol.solution());
-    }
-    
-    public int solution() {
+      template: `class Solution {
+    public int solution(int[] nums) {
         // Write your solution here
-        return 0;
+        // You only need to implement this function
+        // The driver code will be provided automatically
+        
+        return 0; // Replace with your solution
     }
 }`,
       extension: "java",
     },
     cpp: {
       name: "C++",
-      template: `#include <iostream>
-#include <vector>
-#include <string>
-using namespace std;
-
-class Solution {
+      template: `class Solution {
 public:
-    int solution() {
+    int solution(vector<int>& nums) {
         // Write your solution here
-        return 0;
+        // You only need to implement this function
+        // The driver code will be provided automatically
+        
+        return 0; // Replace with your solution
     }
-};
-
-int main() {
-    Solution sol;
-    // Test your solution
-    cout << sol.solution() << endl;
-    return 0;
-}`,
+};`,
       extension: "cpp",
     },
   }
@@ -123,7 +114,6 @@ int main() {
       try {
         setIsLoading(true)
         const response = await api.get(`/practice/problems/${problemId}`)
-        console.log("response",response);
         setProblem(response.data.problem)
 
         // Load saved code or use template
@@ -316,7 +306,6 @@ int main() {
 
   return (
     <div className={`bg-gray-900 text-white ${isFullscreen ? "fixed inset-0 z-50" : "min-h-screen"}`}>
-      <Navbar />
       {/* Header */}
       <div className="bg-gray-800 border-b border-gray-700 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center space-x-4">
@@ -549,6 +538,14 @@ int main() {
                             {result.actualOutput || "No output"}
                           </pre>
                         </div>
+                        {result.stdout && result.stdout !== result.actualOutput && (
+                          <div>
+                            <span className="text-sm font-medium text-blue-400">Console Output:</span>
+                            <pre className="mt-1 text-sm bg-blue-900/20 border border-blue-700 p-2 rounded overflow-x-auto">
+                              {result.stdout}
+                            </pre>
+                          </div>
+                        )}
                         {result.stderr && (
                           <div>
                             <span className="text-sm font-medium text-red-400">Error:</span>
@@ -637,6 +634,13 @@ int main() {
                 <RotateCcw className="h-4 w-4 mr-1" />
                 Reset
               </button>
+              <button
+                onClick={() => setShowInstructions(!showInstructions)}
+                className="flex items-center px-3 py-1 text-sm text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
+              >
+                <Info className="h-4 w-4 mr-1" />
+                {showInstructions ? "Hide Instructions" : "Show Instructions"}
+              </button>
             </div>
 
             <div className="flex items-center space-x-2">
@@ -658,6 +662,32 @@ int main() {
               </button>
             </div>
           </div>
+
+          {/* Instructions Banner */}
+          {showInstructions && (
+            <div className="bg-blue-900/30 border-b border-blue-700 p-3 text-sm text-blue-200">
+              <div className="flex items-start">
+                <Info className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-medium mb-1">Instructions:</p>
+                  <ul className="list-disc list-inside space-y-1 ml-1">
+                    <li>
+                      Only implement the <code className="bg-blue-900/50 px-1 rounded">solution</code> function. The
+                      driver code will be provided automatically.
+                    </li>
+                    <li>Your function should accept the input parameters and return the expected output.</li>
+                    <li>
+                      You can use <code className="bg-blue-900/50 px-1 rounded">console.log</code> or{" "}
+                      <code className="bg-blue-900/50 px-1 rounded">print</code> for debugging - these will appear in
+                      the output.
+                    </li>
+                    <li>Click "Run" to test your solution against a single test case.</li>
+                    <li>Click "Submit" to test against all test cases.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Code Editor */}
           <div className="flex-1">

@@ -30,6 +30,146 @@ const STATUS_MAPPING = {
   14: "Exec Format Error",
 }
 
+// Driver code templates for different languages
+const DRIVER_TEMPLATES = {
+  javascript: (userCode, testCase) => {
+    const input = JSON.stringify(testCase.input)
+    return `
+// User solution
+${userCode}
+
+// Driver code
+function runTest() {
+  console.log("Input:", ${input});
+  
+  // Parse input if needed
+  const parsedInput = ${input};
+  
+  // Call the solution function with the parsed input
+  const result = solution(...parsedInput);
+  
+  console.log("Your output:", result);
+  console.log("Expected output:", ${JSON.stringify(testCase.output)});
+  
+  return result;
+}
+
+// Execute test
+runTest();
+`
+  },
+
+  python: (userCode, testCase) => {
+    const input = JSON.stringify(testCase.input)
+    return `
+# User solution
+${userCode}
+
+# Driver code
+def run_test():
+    print("Input:", ${input})
+    
+    # Parse input if needed
+    parsed_input = ${input}
+    
+    # Call the solution function with the parsed input
+    result = solution(*parsed_input)
+    
+    print("Your output:", result)
+    print("Expected output:", ${JSON.stringify(testCase.output)})
+    
+    return result
+
+# Execute test
+run_test()
+`
+  },
+
+  java: (userCode, testCase) => {
+    const input = JSON.stringify(testCase.input)
+    return `
+import java.util.*;
+
+public class Main {
+    // User solution
+    ${userCode}
+    
+    // Driver code
+    public static void main(String[] args) {
+        System.out.println("Input: " + ${input});
+        
+        // Parse input if needed
+        String[] inputArray = ${input}.toString().replaceAll("\\\\[|\\\\]", "").split(",");
+        
+        // Call the solution method
+        Solution solution = new Solution();
+        Object result = solution.solution(inputArray);
+        
+        System.out.println("Your output: " + result);
+        System.out.println("Expected output: " + ${JSON.stringify(testCase.output)});
+    }
+}
+
+class Solution {
+    ${userCode.includes("public") ? "" : "public Object solution(String[] args) { return null; }"}
+}
+`
+  },
+
+  cpp: (userCode, testCase) => {
+    const input = JSON.stringify(testCase.input)
+    return `
+#include <iostream>
+#include <vector>
+#include <string>
+using namespace std;
+
+// User solution
+${userCode}
+
+// Driver code
+int main() {
+    cout << "Input: " << ${input} << endl;
+    
+    // Create a solution instance
+    Solution solution;
+    
+    // Call the solution method
+    auto result = solution.solution();
+    
+    cout << "Your output: " << result << endl;
+    cout << "Expected output: " << ${JSON.stringify(testCase.output)} << endl;
+    
+    return 0;
+}
+`
+  },
+}
+
+// Function to wrap user code with driver code
+const wrapWithDriverCode = (code, language, testCase) => {
+  // Check if the code already has a main function or entry point
+  const hasMainFunction = {
+    javascript: code.includes("function runTest") || code.includes("console.log"),
+    python: code.includes("if __name__ == ") || code.includes("print("),
+    java: code.includes("public static void main"),
+    cpp: code.includes("int main("),
+  }
+
+  // If the code already has a main function, return it as is
+  if (hasMainFunction[language]) {
+    return code
+  }
+
+  // Otherwise, wrap it with driver code
+  if (DRIVER_TEMPLATES[language]) {
+    return DRIVER_TEMPLATES[language](code, testCase)
+  }
+
+  // If no template is available, return the original code
+  return code
+}
+
 // Enhanced function to evaluate code using Judge0 API
 const evaluateCode = async (code, language, testCases) => {
   try {
@@ -49,7 +189,10 @@ const evaluateCode = async (code, language, testCases) => {
     const results = await Promise.all(
       testCases.map(async (testCase, index) => {
         try {
-          const submission = await createSubmission(code, languageId, testCase.input)
+          // Wrap user code with driver code if needed
+          const wrappedCode = wrapWithDriverCode(code, language, testCase)
+
+          const submission = await createSubmission(wrappedCode, languageId, testCase.input)
 
           if (!submission.token) {
             throw new Error("Failed to create submission - no token received")
@@ -139,8 +282,11 @@ const runCode = async (code, language, testCase) => {
 
     console.log(`Running ${language} code`)
 
+    // Wrap user code with driver code if needed
+    const wrappedCode = wrapWithDriverCode(code, language, testCase)
+
     // Create submission
-    const submission = await createSubmission(code, languageId, testCase.input)
+    const submission = await createSubmission(wrappedCode, languageId, testCase.input)
 
     if (!submission.token) {
       throw new Error("Failed to create submission - no token received")
@@ -167,6 +313,7 @@ const runCode = async (code, language, testCase) => {
         memoryUsed: result.memory ? Number.parseInt(result.memory) : null,
         error: result.stderr || result.compile_output || null,
         exitCode: result.exit_code,
+        stdout: result.stdout, // Include full stdout for debugging messages
       },
     }
   } catch (error) {
@@ -316,6 +463,9 @@ const simulateEvaluation = (code, testCases) => {
       memoryUsed: Math.floor(Math.random() * 1000) + 500, // Random memory usage
       error: null,
       exitCode: 0,
+      stdout: passed
+        ? `Input: ${JSON.stringify(testCase.input)}\nYour output: ${testCase.output}\nExpected output: ${testCase.output}`
+        : "No output",
     }
   })
 
@@ -357,6 +507,9 @@ const simulateExecution = (code, testCase) => {
       memoryUsed: Math.floor(Math.random() * 1000) + 500,
       error: null,
       exitCode: 0,
+      stdout: passed
+        ? `Input: ${JSON.stringify(testCase.input)}\nYour output: ${testCase.output}\nExpected output: ${testCase.output}`
+        : "No output",
     },
   }
 }
@@ -370,10 +523,41 @@ const getSupportedLanguages = () => {
   }))
 }
 
+// Function to get language templates for function-only solutions
+const getLanguageTemplates = () => {
+  return {
+    javascript: `function solution(nums) {
+  // Write your solution here
+  
+  return result;
+}`,
+    python: `def solution(nums):
+    # Write your solution here
+    
+    return result`,
+    java: `class Solution {
+    public int solution(int[] nums) {
+        // Write your solution here
+        
+        return result;
+    }
+}`,
+    cpp: `class Solution {
+public:
+    int solution(vector<int>& nums) {
+        // Write your solution here
+        
+        return result;
+    }
+};`,
+  }
+}
+
 module.exports = {
   evaluateCode,
   runCode,
   getSupportedLanguages,
+  getLanguageTemplates,
   LANGUAGE_IDS,
   STATUS_MAPPING,
 }

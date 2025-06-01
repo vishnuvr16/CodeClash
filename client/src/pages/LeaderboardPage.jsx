@@ -14,7 +14,7 @@ const LeaderboardPage = () => {
   const [userRank, setUserRank] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [timeFilter, setTimeFilter] = useState("all") // all, week, month
+  const [timeFilter, setTimeFilter] = useState("all-time") // all, week, month
   const [searchQuery, setSearchQuery] = useState("")
   const [showFilters, setShowFilters] = useState(false)
   const [sortBy, setSortBy] = useState("rating") // rating, winRate, matches
