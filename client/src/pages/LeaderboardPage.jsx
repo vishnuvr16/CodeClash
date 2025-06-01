@@ -25,32 +25,35 @@ const LeaderboardPage = () => {
   }, [timeFilter, sortBy, sortOrder])
 
   const fetchLeaderboard = async () => {
-    try {
-      setIsLoading(true)
-      setError(null)
+  try {
+    setIsLoading(true)
+    setError(null)
 
-      const params = new URLSearchParams({
-        timeFilter,
-        sortBy,
-        order: sortOrder,
-        limit: 50,
-      })
+    const params = new URLSearchParams({
+      timeFilter,
+      sortBy,
+      order: sortOrder,
+      limit: 50,
+    })
 
-      if (searchQuery) {
-        params.append("search", searchQuery)
-      }
-
-      const response = await api.get(`/leaderboard?${params.toString()}`)
-      setLeaderboard(response.data.leaderboard)
-      setUserRank(response.data.userRank)
-    } catch (error) {
-      console.error("Error fetching leaderboard:", error)
-      setError("Failed to load leaderboard. Please try again.")
-      toast.error("Failed to load leaderboard")
-    } finally {
-      setIsLoading(false)
+    if (searchQuery) {
+      params.append("search", searchQuery)
     }
+
+    const response = await api.get(`/leaderboard?${params.toString()}`)
+    
+    // Add safety checks here
+    setLeaderboard(response.data.leaderboard || [])
+    setUserRank(response.data.userRank)
+  } catch (error) {
+    console.error("Error fetching leaderboard:", error)
+    setError("Failed to load leaderboard. Please try again.")
+    setLeaderboard([]) // Ensure it's always an array
+    toast.error("Failed to load leaderboard")
+  } finally {
+    setIsLoading(false)
   }
+}
 
   const handleSearch = (e) => {
     e.preventDefault()
@@ -107,9 +110,9 @@ const LeaderboardPage = () => {
     return { label: "Newbie", color: "bg-gray-600" }
   }
 
-  const filteredLeaderboard = leaderboard.filter((user) =>
-    user.username.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
+  const filteredLeaderboard = (leaderboard || []).filter((user) =>
+  user.username.toLowerCase().includes(searchQuery.toLowerCase()),
+)
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
