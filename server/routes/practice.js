@@ -2,7 +2,7 @@ const express = require("express")
 const Problem = require("../models/Problem")
 const User = require("../models/User")
 const { authenticateToken } = require("../middleware/auth")
-const { executeCode } = require("../utils/codeEvaluation")
+const { evaluateCode, runCode } = require("../utils/codeEvaluation")
 
 const router = express.Router()
 
@@ -41,8 +41,10 @@ router.get("/problems", authenticateToken, async (req, res) => {
     // If user is authenticated, check which problems they've solved
     let solvedProblems = []
     if (req.user) {
-      const user = await User.findById(req.user.id).select("solvedProblems")
-      solvedProblems = user.solvedProblems.map((sp) => sp.problemId.toString())
+      const user = await User.findById(req.user._id).select("solvedProblems")
+      if (user && user.solvedProblems) {
+        solvedProblems = user.solvedProblems.map((sp) => (sp.problemId ? sp.problemId.toString() : ""))
+      }
     }
 
     // Add solved status to problems
@@ -59,23 +61,12 @@ router.get("/problems", authenticateToken, async (req, res) => {
     })
   } catch (error) {
     console.error("Error fetching problems:", error)
-    res.status(500).json({ message: "Server error" })
-  }
-})
-
-// Get available tags
-router.get("/tags", async (req, res) => {
-  try {
-    const tags = await Problem.distinct("tags")
-    res.json({ tags })
-  } catch (error) {
-    console.error("Error fetching tags:", error)
-    res.status(500).json({ message: "Server error" })
+    res.status(500).json({ message: "Server error", error: error.message })
   }
 })
 
 // Get a single problem for practice
-router.get("/problems/:id",authenticateToken, async (req, res) => {
+router.get("/problems/:id", authenticateToken, async (req, res) => {
   try {
     const problem = await Problem.findById(req.params.id)
 
@@ -85,19 +76,25 @@ router.get("/problems/:id",authenticateToken, async (req, res) => {
       })
     }
 
-    console.log("pr",req.user._id);
-
     // Get user's submission for this problem if exists
-    const user = await User.findById(req.user._id)
-      .select("solvedProblems submissions")
-      .populate({
-        path: "submissions",
-        match: { problem: req.params.id },
-        select: "code language isCorrect submittedAt",
-      })
+    let isSolved = false
+    let submissions = []
 
-    const isSolved = user.solvedProblems.includes(problem._id.toString())
-    const submissions = user.submissions || []
+    if (req.user) {
+      const user = await User.findById(req.user._id)
+
+      if (user) {
+        // Check if problem is solved
+        if (user.solvedProblems && Array.isArray(user.solvedProblems)) {
+          isSolved = user.solvedProblems.some((sp) => sp.problemId && sp.problemId.toString() === req.params.id)
+        }
+
+        // Get submissions
+        if (user.submissions && Array.isArray(user.submissions)) {
+          submissions = user.submissions.filter((sub) => sub.problemId && sub.problemId.toString() === req.params.id)
+        }
+      }
+    }
 
     res.status(200).json({
       problem,
@@ -105,10 +102,10 @@ router.get("/problems/:id",authenticateToken, async (req, res) => {
       submissions,
     })
   } catch (error) {
-    console.log("id",req.user);
     console.error("Error fetching problem:", error)
     res.status(500).json({
       message: "Server error while fetching problem",
+      error: error.message,
     })
   }
 })
@@ -119,6 +116,14 @@ router.post("/problems/:id/run", authenticateToken, async (req, res) => {
     const { code, language, testCaseIndex = 0 } = req.body
     const problemId = req.params.id
 
+    if (!code) {
+      return res.status(400).json({ message: "Code is required" })
+    }
+
+    if (!language) {
+      return res.status(400).json({ message: "Language is required" })
+    }
+
     const problem = await Problem.findById(problemId)
     if (!problem) {
       return res.status(404).json({ message: "Problem not found" })
@@ -126,19 +131,30 @@ router.post("/problems/:id/run", authenticateToken, async (req, res) => {
 
     // Get the specific test case (only visible ones)
     const visibleTestCases = problem.testCases.filter((tc) => !tc.hidden)
-    const testCase = visibleTestCases[testCaseIndex]
 
-    if (!testCase) {
-      return res.status(400).json({ message: "Invalid test case index" })
+    if (visibleTestCases.length === 0) {
+      return res.status(400).json({ message: "No visible test cases available" })
     }
 
-    // Execute code
-    const result = await executeCode(code, language, [testCase])
+    const testCase = visibleTestCases[testCaseIndex] || visibleTestCases[0]
 
-    res.json({ result: result[0] })
+    // Execute code
+    const result = await runCode(code, language, testCase)
+
+    if (!result.success) {
+      return res.status(400).json({
+        message: "Code execution failed",
+        error: result.error,
+      })
+    }
+
+    res.json({ result: result.result })
   } catch (error) {
     console.error("Error running code:", error)
-    res.status(500).json({ message: "Code execution failed" })
+    res.status(500).json({
+      message: "Code execution failed",
+      error: error.message,
+    })
   }
 })
 
@@ -147,7 +163,15 @@ router.post("/problems/:id/submit", authenticateToken, async (req, res) => {
   try {
     const { code, language } = req.body
     const problemId = req.params.id
-    const userId = req.user.id
+    const userId = req.user._id
+
+    if (!code) {
+      return res.status(400).json({ message: "Code is required" })
+    }
+
+    if (!language) {
+      return res.status(400).json({ message: "Language is required" })
+    }
 
     const problem = await Problem.findById(problemId)
     if (!problem) {
@@ -155,36 +179,25 @@ router.post("/problems/:id/submit", authenticateToken, async (req, res) => {
     }
 
     // Evaluate code against all test cases
-    const results = await executeCode(code, language, problem.testCases)
+    const evaluation = await evaluateCode(code, language, problem.testCases)
 
-    // Check if all test cases passed
-    const allPassed = results.every((result) => result.passed)
-    const passedCount = results.filter((result) => result.passed).length
-
-    // Determine status
-    let status = "Wrong Answer"
-    if (allPassed) {
-      status = "Accepted"
-    } else if (results.some((r) => r.stderr)) {
-      status = "Runtime Error"
-    } else if (results.some((r) => r.statusId === 5)) {
-      // Time Limit Exceeded
-      status = "Time Limit Exceeded"
+    if (!evaluation.success) {
+      return res.status(400).json({
+        message: "Code evaluation failed",
+        error: evaluation.error,
+      })
     }
 
-    // Calculate execution time and memory
-    const avgExecutionTime = results.reduce((sum, r) => sum + (r.executionTime || 0), 0) / results.length
-    const maxMemoryUsed = Math.max(...results.map((r) => r.memoryUsed || 0))
+    const allPassed = evaluation.allPassed
+    const results = evaluation.results
 
     // Create submission record
     const submission = {
       problemId,
       code,
       language,
-      status,
+      status: allPassed ? "Accepted" : "Wrong Answer",
       submittedAt: new Date(),
-      executionTime: avgExecutionTime,
-      memoryUsed: maxMemoryUsed,
       testResults: results.map((r) => ({
         input: r.input,
         expectedOutput: r.expectedOutput,
@@ -196,6 +209,26 @@ router.post("/problems/:id/submit", authenticateToken, async (req, res) => {
 
     // Update user record
     const user = await User.findById(userId)
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" })
+    }
+
+    // Initialize arrays and statistics if they don't exist
+    if (!user.submissions) user.submissions = []
+    if (!user.solvedProblems) user.solvedProblems = []
+    if (!user.statistics) {
+      user.statistics = {
+        totalSubmissions: 0,
+        acceptedSubmissions: 0,
+        easyProblemsSolved: 0,
+        mediumProblemsSolved: 0,
+        hardProblemsSolved: 0,
+        currentStreak: 0,
+        longestStreak: 0,
+      }
+    }
+
     user.submissions.push(submission)
     user.statistics.totalSubmissions += 1
 
@@ -203,7 +236,7 @@ router.post("/problems/:id/submit", authenticateToken, async (req, res) => {
       user.statistics.acceptedSubmissions += 1
 
       // Check if this is the first time solving this problem
-      const alreadySolved = user.solvedProblems.some((sp) => sp.problemId.toString() === problemId)
+      const alreadySolved = user.solvedProblems.some((sp) => sp.problemId && sp.problemId.toString() === problemId)
 
       if (!alreadySolved) {
         user.solvedProblems.push({
@@ -211,21 +244,15 @@ router.post("/problems/:id/submit", authenticateToken, async (req, res) => {
           solvedAt: new Date(),
           language,
           code,
-          executionTime: avgExecutionTime,
-          memoryUsed: maxMemoryUsed,
         })
 
         // Update difficulty-specific counters
-        switch (problem.difficulty) {
-          case "Easy":
-            user.statistics.easyProblemsSolved += 1
-            break
-          case "Medium":
-            user.statistics.mediumProblemsSolved += 1
-            break
-          case "Hard":
-            user.statistics.hardProblemsSolved += 1
-            break
+        if (problem.difficulty === "Easy") {
+          user.statistics.easyProblemsSolved = (user.statistics.easyProblemsSolved || 0) + 1
+        } else if (problem.difficulty === "Medium") {
+          user.statistics.mediumProblemsSolved = (user.statistics.mediumProblemsSolved || 0) + 1
+        } else if (problem.difficulty === "Hard") {
+          user.statistics.hardProblemsSolved = (user.statistics.hardProblemsSolved || 0) + 1
         }
 
         // Update streak
@@ -234,8 +261,8 @@ router.post("/problems/:id/submit", authenticateToken, async (req, res) => {
 
         if (lastSolved) {
           const daysDiff = Math.floor((today - lastSolved) / (1000 * 60 * 60 * 24))
-          if (daysDiff === 1) {
-            user.statistics.currentStreak += 1
+          if (daysDiff === 0 || daysDiff === 1) {
+            user.statistics.currentStreak = (user.statistics.currentStreak || 0) + 1
           } else if (daysDiff > 1) {
             user.statistics.currentStreak = 1
           }
@@ -243,7 +270,7 @@ router.post("/problems/:id/submit", authenticateToken, async (req, res) => {
           user.statistics.currentStreak = 1
         }
 
-        user.statistics.longestStreak = Math.max(user.statistics.longestStreak, user.statistics.currentStreak)
+        user.statistics.longestStreak = Math.max(user.statistics.longestStreak || 0, user.statistics.currentStreak || 0)
         user.statistics.lastSolvedDate = today
       }
     }
@@ -259,21 +286,17 @@ router.post("/problems/:id/submit", authenticateToken, async (req, res) => {
 
     res.json({
       isCorrect: allPassed,
-      status,
-      passedCount,
+      status: allPassed ? "Accepted" : "Wrong Answer",
+      passedCount: results.filter((r) => r.passed).length,
       totalCount: results.length,
-      results: results.map((r) => ({
-        ...r,
-        input: r.input,
-        expectedOutput: r.expectedOutput,
-        actualOutput: r.actualOutput,
-      })),
-      executionTime: avgExecutionTime,
-      memoryUsed: maxMemoryUsed,
+      results,
     })
   } catch (error) {
     console.error("Error submitting solution:", error)
-    res.status(500).json({ message: "Submission failed" })
+    res.status(500).json({
+      message: "Submission failed",
+      error: error.message,
+    })
   }
 })
 
@@ -281,40 +304,26 @@ router.post("/problems/:id/submit", authenticateToken, async (req, res) => {
 router.get("/problems/:id/submissions", authenticateToken, async (req, res) => {
   try {
     const problemId = req.params.id
-    const userId = req.user.id
+    const userId = req.user._id
 
-    const user = await User.findById(userId).select("submissions")
-    const submissions = user.submissions
-      .filter((sub) => sub.problemId.toString() === problemId)
-      .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))
-      .slice(0, 20) // Last 20 submissions
+    const user = await User.findById(userId)
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" })
+    }
+
+    const submissions =
+      user.submissions && Array.isArray(user.submissions)
+        ? user.submissions
+            .filter((sub) => sub.problemId && sub.problemId.toString() === problemId)
+            .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))
+            .slice(0, 20) // Last 20 submissions
+        : []
 
     res.json({ submissions })
   } catch (error) {
     console.error("Error fetching submissions:", error)
-    res.status(500).json({ message: "Server error" })
-  }
-})
-
-// Get user's overall statistics
-router.get("/stats", authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.id
-    const user = await User.findById(userId).select("statistics solvedProblems")
-
-    const stats = {
-      ...user.statistics.toObject(),
-      totalSolved: user.solvedProblems.length,
-      acceptanceRate:
-        user.statistics.totalSubmissions > 0
-          ? Math.round((user.statistics.acceptedSubmissions / user.statistics.totalSubmissions) * 100)
-          : 0,
-    }
-
-    res.json({ stats })
-  } catch (error) {
-    console.error("Error fetching stats:", error)
-    res.status(500).json({ message: "Server error" })
+    res.status(500).json({ message: "Server error", error: error.message })
   }
 })
 
