@@ -26,6 +26,16 @@ import {
 } from "lucide-react"
 import api from "../utils/api"
 
+const getTrophyTier = (trophies) => {
+  if (trophies >= 5000) return { name: "Legend", color: "text-red-400", icon: "👑" }
+  if (trophies >= 3000) return { name: "Champion", color: "text-cyan-400", icon: "🏆" }
+  if (trophies >= 2000) return { name: "Master", color: "text-blue-400", icon: "🥇" }
+  if (trophies >= 1000) return { name: "Expert", color: "text-green-400", icon: "🥈" }
+  if (trophies >= 500) return { name: "Advanced", color: "text-yellow-400", icon: "🥉" }
+  if (trophies >= 200) return { name: "Intermediate", color: "text-purple-400", icon: "🏅" }
+  return { name: "Beginner", color: "text-gray-400", icon: "🔰" }
+}
+
 const Dashboard = () => {
   const { currentUser } = useAuth()
   const { joinMatchmaking } = useSocket()
@@ -136,8 +146,8 @@ const Dashboard = () => {
             </div>
             <div className="hidden md:flex items-center space-x-4">
               <div className="text-right">
-                <div className="text-2xl font-bold text-purple-400">{userStats?.user?.rating || 1200}</div>
-                <div className="text-sm text-gray-400">Current Rating</div>
+                <div className="text-2xl font-bold text-purple-400">{userStats?.user?.trophies || 100}</div>
+                <div className="text-sm text-gray-400">Current Trophies</div>
               </div>
             </div>
           </div>
@@ -157,8 +167,8 @@ const Dashboard = () => {
             <>
               <div className="bg-gradient-to-br from-purple-600 to-purple-700 rounded-xl p-6 text-white">
                 <Trophy className="h-8 w-8 mb-4" />
-                <div className="text-2xl font-bold">{userStats?.user?.rating || 1200}</div>
-                <div className="text-purple-200 text-sm">Rating</div>
+                <div className="text-2xl font-bold">{userStats?.user?.trophies || 100}</div>
+                <div className="text-purple-200 text-sm">Trophies</div>
               </div>
 
               <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-6 text-white">
@@ -214,7 +224,10 @@ const Dashboard = () => {
                     <h2 className="text-xl font-bold">{currentUser?.username || "User"}</h2>
                     <div className="flex items-center mt-1">
                       <Trophy className="h-4 w-4 text-yellow-500 mr-1" />
-                      <span className="text-lg font-semibold text-purple-400">{userStats?.user?.rating || 1200}</span>
+                      <span className="text-lg font-semibold text-purple-400">{userStats?.user?.trophies || 100}</span>
+                      <span className="ml-2 text-xs px-2 py-1 rounded-full bg-purple-900/20 text-purple-300">
+                        {getTrophyTier(userStats?.user?.trophies || 100).name}
+                      </span>
                     </div>
                   </div>
                 </div>

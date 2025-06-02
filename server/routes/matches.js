@@ -4,16 +4,24 @@ const Match = require("../models/Match")
 const User = require("../models/User")
 const Problem = require("../models/Problem")
 const { evaluateCode, runCode } = require("../utils/codeEvaluation")
-const { updateRating } = require("../utils/ratingSystem")
 const { authenticateToken } = require("../middleware/auth")
-// Get match details
-router.get("/:id", authenticateToken, async (req, res) => {
-  try {
-    const { id } = req.params
 
-    const match = await Match.findById(id)
-      .populate("userA", "username rating")
-      .populate("userB", "username rating")
+// Trophy rewards/penalties for duels
+const DUEL_TROPHY_REWARDS = {
+  win: 25,
+  loss: -15,
+  draw: 0,
+}
+
+// Get match details
+router.get("/:matchId", authenticateToken, async (req, res) => {
+  try {
+    const { matchId } = req.params
+    const userId = req.user.id
+
+    const match = await Match.findById(matchId)
+      .populate("userA", "username trophies")
+      .populate("userB", "username trophies")
       .populate("problem")
 
     if (!match) {
@@ -22,14 +30,12 @@ router.get("/:id", authenticateToken, async (req, res) => {
         message: "Match not found",
       })
     }
-    
 
-    // Check if user is part of this match
-    const userId = req.user.id
+    // Check if user is part of the match
     if (match.userA._id.toString() !== userId && match.userB._id.toString() !== userId) {
       return res.status(403).json({
         success: false,
-        message: "Access denied",
+        message: "Not authorized to view this match",
       })
     }
 
@@ -47,11 +53,12 @@ router.get("/:id", authenticateToken, async (req, res) => {
   }
 })
 
-// Run code against a test case
-router.post("/:id/run", authenticateToken, async (req, res) => {
+// Run code against a test case in a match
+router.post("/:matchId/run", authenticateToken, async (req, res) => {
   try {
-    const { id } = req.params
+    const { matchId } = req.params
     const { code, language, testCaseIndex = 0 } = req.body
+    const userId = req.user.id
 
     if (!code || !language) {
       return res.status(400).json({
@@ -61,7 +68,7 @@ router.post("/:id/run", authenticateToken, async (req, res) => {
     }
 
     // Find the match
-    const match = await Match.findById(id).populate("problem")
+    const match = await Match.findById(matchId).populate("problem")
     if (!match) {
       return res.status(404).json({
         success: false,
@@ -69,12 +76,11 @@ router.post("/:id/run", authenticateToken, async (req, res) => {
       })
     }
 
-    // Check if user is part of this match
-    const userId = req.user.id
+    // Check if user is part of the match
     if (match.userA.toString() !== userId && match.userB.toString() !== userId) {
       return res.status(403).json({
         success: false,
-        message: "Access denied",
+        message: "Not authorized to run code in this match",
       })
     }
 
@@ -86,23 +92,19 @@ router.post("/:id/run", authenticateToken, async (req, res) => {
       })
     }
 
-    // Get the test case (use public test cases only for running)
+    // Get the test case (use first public test case)
     const publicTestCases = match.problem.testCases.filter((tc) => !tc.isHidden)
+    const testCase = publicTestCases[0]
 
-    if (testCaseIndex >= publicTestCases.length) {
+    if (!testCase) {
       return res.status(400).json({
         success: false,
-        message: "Invalid test case index",
+        message: "No test cases available",
       })
     }
 
-    const testCase = publicTestCases[testCaseIndex]
-
-    // Run the code
-    const result = await runCode(code, language, {
-      input: testCase.input,
-      output: testCase.output,
-    })
+    // Run the code with problem-specific driver
+    const result = await runCode(code, language, match.problem, testCase)
 
     if (!result.success) {
       return res.status(400).json({
@@ -125,11 +127,12 @@ router.post("/:id/run", authenticateToken, async (req, res) => {
   }
 })
 
-// Submit solution
-router.post("/:id/submit", authenticateToken, async (req, res) => {
+// Submit solution in a match
+router.post("/:matchId/submit", authenticateToken, async (req, res) => {
   try {
-    const { id } = req.params
+    const { matchId } = req.params
     const { code, language } = req.body
+    const userId = req.user.id
 
     if (!code || !language) {
       return res.status(400).json({
@@ -139,7 +142,7 @@ router.post("/:id/submit", authenticateToken, async (req, res) => {
     }
 
     // Find the match
-    const match = await Match.findById(id).populate("problem userA userB")
+    const match = await Match.findById(matchId).populate("problem")
     if (!match) {
       return res.status(404).json({
         success: false,
@@ -147,12 +150,11 @@ router.post("/:id/submit", authenticateToken, async (req, res) => {
       })
     }
 
-    // Check if user is part of this match
-    const userId = req.user.id
-    if (match.userA._id.toString() !== userId && match.userB._id.toString() !== userId) {
+    // Check if user is part of the match
+    if (match.userA.toString() !== userId && match.userB.toString() !== userId) {
       return res.status(403).json({
         success: false,
-        message: "Access denied",
+        message: "Not authorized to submit in this match",
       })
     }
 
@@ -164,8 +166,8 @@ router.post("/:id/submit", authenticateToken, async (req, res) => {
       })
     }
 
-    // Evaluate code against all test cases
-    const evaluation = await evaluateCode(code, language, match.problem.testCases)
+    // Evaluate code against all test cases with problem-specific driver
+    const evaluation = await evaluateCode(code, language, match.problem, match.problem.testCases)
 
     if (!evaluation.success) {
       return res.status(400).json({
@@ -177,57 +179,53 @@ router.post("/:id/submit", authenticateToken, async (req, res) => {
     const isCorrect = evaluation.allPassed
 
     if (isCorrect) {
-      // User solved the problem - they win!
-      match.status = "completed"
-      match.winner = userId
-      match.endTime = new Date()
-      match.solution = {
-        userId,
-        code,
-        language,
-        submittedAt: new Date(),
-      }
+      // User solved the problem - they win the match
+      const winnerId = userId
+      const loserId = match.userA.toString() === userId ? match.userB.toString() : match.userA.toString()
 
+      // Update match
+      match.status = "completed"
+      match.winner = winnerId
+      match.endTime = new Date()
       await match.save()
 
-      // Update ratings
-      const isUserA = match.userA._id.toString() === userId
-      const winner = isUserA ? match.userA : match.userB
-      const loser = isUserA ? match.userB : match.userA
+      // Update user statistics and trophies
+      const winner = await User.findById(winnerId)
+      const loser = await User.findById(loserId)
 
-      await updateRating(winner._id, loser._id, "win")
+      if (winner && loser) {
+        // Winner gains trophies
+        winner.addTrophyHistory("earned", DUEL_TROPHY_REWARDS.win, `Won duel against ${loser.username}`, null, matchId)
+        winner.matchesWon += 1
+        winner.matchesPlayed += 1
 
-      // Update user statistics
-      await Promise.all([
-        User.findByIdAndUpdate(winner._id, {
-          $inc: {
-            matchesPlayed: 1,
-            matchesWon: 1,
-            totalRatingGained: 25, // Simplified rating gain
-          },
-          $push: { matchHistory: match._id },
-        }),
-        User.findByIdAndUpdate(loser._id, {
-          $inc: {
-            matchesPlayed: 1,
-            matchesLost: 1,
-            totalRatingLost: 25, // Simplified rating loss
-          },
-          $push: { matchHistory: match._id },
-        }),
-      ])
+        // Loser loses trophies
+        loser.addTrophyHistory(
+          "lost",
+          Math.abs(DUEL_TROPHY_REWARDS.loss),
+          `Lost duel to ${winner.username}`,
+          null,
+          matchId,
+        )
+        loser.matchesLost += 1
+        loser.matchesPlayed += 1
+
+        await Promise.all([winner.save(), loser.save()])
+      }
 
       res.json({
         success: true,
         isCorrect: true,
-        match: await Match.findById(id).populate("userA userB problem"),
-        message: "Congratulations! You won the match!",
+        match: match.toObject(),
+        trophiesEarned: DUEL_TROPHY_REWARDS.win,
+        message: `Congratulations! You solved the problem and won the duel! You earned ${DUEL_TROPHY_REWARDS.win} trophies!`,
       })
     } else {
+      // Solution is incorrect
       res.json({
         success: true,
         isCorrect: false,
-        evaluation,
+        results: evaluation.results,
         message: "Solution incorrect. Keep trying!",
       })
     }
@@ -241,14 +239,14 @@ router.post("/:id/submit", authenticateToken, async (req, res) => {
   }
 })
 
-// Concede match
-router.post("/:id/concede", authenticateToken, async (req, res) => {
+// Concede a match
+router.post("/:matchId/concede", authenticateToken, async (req, res) => {
   try {
-    const { id } = req.params
+    const { matchId } = req.params
     const userId = req.user.id
 
     // Find the match
-    const match = await Match.findById(id).populate("userA userB")
+    const match = await Match.findById(matchId)
     if (!match) {
       return res.status(404).json({
         success: false,
@@ -256,11 +254,11 @@ router.post("/:id/concede", authenticateToken, async (req, res) => {
       })
     }
 
-    // Check if user is part of this match
-    if (match.userA._id.toString() !== userId && match.userB._id.toString() !== userId) {
+    // Check if user is part of the match
+    if (match.userA.toString() !== userId && match.userB.toString() !== userId) {
       return res.status(403).json({
         success: false,
-        message: "Access denied",
+        message: "Not authorized to concede this match",
       })
     }
 
@@ -272,47 +270,53 @@ router.post("/:id/concede", authenticateToken, async (req, res) => {
       })
     }
 
-    // Determine winner and loser
-    const isUserA = match.userA._id.toString() === userId
-    const loser = isUserA ? match.userA : match.userB
-    const winner = isUserA ? match.userB : match.userA
+    // Set opponent as winner
+    const isUserA = match.userA.toString() === userId
+    const winnerId = isUserA ? match.userB.toString() : match.userA.toString()
+    const loserId = userId
 
     // Update match
     match.status = "completed"
-    match.winner = winner._id
+    match.winner = winnerId
     match.endTime = new Date()
     match.concedeBy = userId
-    match.endReason = "concede"
-
     await match.save()
 
-    // Update ratings
-    await updateRating(winner._id, loser._id, "win")
+    // Update user statistics and trophies
+    const winner = await User.findById(winnerId)
+    const loser = await User.findById(loserId)
 
-    // Update user statistics
-    await Promise.all([
-      User.findByIdAndUpdate(winner._id, {
-        $inc: {
-          matchesPlayed: 1,
-          matchesWon: 1,
-          totalRatingGained: 25,
-        },
-        $push: { matchHistory: match._id },
-      }),
-      User.findByIdAndUpdate(loser._id, {
-        $inc: {
-          matchesPlayed: 1,
-          matchesLost: 1,
-          totalRatingLost: 25,
-        },
-        $push: { matchHistory: match._id },
-      }),
-    ])
+    if (winner && loser) {
+      // Winner gains trophies
+      winner.addTrophyHistory(
+        "earned",
+        DUEL_TROPHY_REWARDS.win,
+        `Won duel (opponent conceded): ${loser.username}`,
+        null,
+        matchId,
+      )
+      winner.matchesWon += 1
+      winner.matchesPlayed += 1
+
+      // Loser loses trophies
+      loser.addTrophyHistory(
+        "lost",
+        Math.abs(DUEL_TROPHY_REWARDS.loss),
+        `Conceded duel to ${winner.username}`,
+        null,
+        matchId,
+      )
+      loser.matchesLost += 1
+      loser.matchesPlayed += 1
+
+      await Promise.all([winner.save(), loser.save()])
+    }
 
     res.json({
       success: true,
-      match: await Match.findById(id).populate("userA userB problem winner", "username rating title"),
       message: "Match conceded successfully",
+      match: match.toObject(),
+      trophiesLost: Math.abs(DUEL_TROPHY_REWARDS.loss),
     })
   } catch (error) {
     console.error("Error conceding match:", error)
@@ -324,7 +328,6 @@ router.post("/:id/concede", authenticateToken, async (req, res) => {
   }
 })
 
-// Get user's recent matches
 router.get("/user/:userId/recent", async (req, res) => {
   try {
     const { userId } = req.params

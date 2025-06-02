@@ -3,6 +3,7 @@ const Problem = require("../models/Problem")
 const User = require("../models/User")
 const { evaluateCode, runCode } = require("../utils/codeEvaluation")
 const { authenticateToken } = require("../middleware/auth")
+
 const router = express.Router()
 
 // Trophy rewards for different difficulties
@@ -84,24 +85,6 @@ router.get("/problems", async (req, res) => {
   }
 })
 
-// Get available tags
-router.get("/tags", async (req, res) => {
-  try {
-    const tags = await Problem.distinct("tags")
-    res.json({
-      success: true,
-      tags: tags.filter((tag) => tag && tag.trim() !== ""),
-    })
-  } catch (error) {
-    console.error("Error fetching tags:", error)
-    res.status(500).json({
-      success: false,
-      message: "Error fetching tags",
-      error: error.message,
-    })
-  }
-})
-
 // Get a specific practice problem
 router.get("/problems/:id", async (req, res) => {
   try {
@@ -178,8 +161,8 @@ router.post("/problems/:id/run", authenticateToken, async (req, res) => {
       })
     }
 
-    // Run the code
-    const result = await runCode(code, language, testCase)
+    // Run the code with problem-specific driver
+    const result = await runCode(code, language, problem, testCase)
 
     if (!result.success) {
       return res.status(400).json({
@@ -224,8 +207,8 @@ router.post("/problems/:id/submit", authenticateToken, async (req, res) => {
       })
     }
 
-    // Evaluate code against all test cases
-    const evaluation = await evaluateCode(code, language, problem.testCases)
+    // Evaluate code against all test cases with problem-specific driver
+    const evaluation = await evaluateCode(code, language, problem, problem.testCases)
 
     if (!evaluation.success) {
       return res.status(400).json({

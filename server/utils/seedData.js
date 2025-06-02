@@ -2,6 +2,7 @@ const mongoose = require("mongoose")
 const User = require("../models/User")
 const Problem = require("../models/Problem")
 const dotenv = require("dotenv")
+const bcrypt = require("bcryptjs")
 
 // Load environment variables
 dotenv.config()
@@ -15,186 +16,158 @@ mongoose
   .then(() => console.log("MongoDB connected for seeding"))
   .catch((err) => console.error("MongoDB connection error:", err))
 
-// Sample problems
-const problems = [
-  {
-    title: "Two Sum",
-    description: `
-Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.
+const seedProblems = async () => {
+  try {
+    // Clear existing problems
+    await Problem.deleteMany({})
+
+    const problems = [
+      {
+        title: "Two Sum",
+        description: `Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.
 
 You may assume that each input would have exactly one solution, and you may not use the same element twice.
 
-You can return the answer in any order.
-
-Example 1:
-Input: nums = [2,7,11,15], target = 9
-Output: [0,1]
-Explanation: Because nums[0] + nums[1] == 9, we return [0, 1].
-
-Example 2:
-Input: nums = [3,2,4], target = 6
-Output: [1,2]
-
-Example 3:
-Input: nums = [3,3], target = 6
-Output: [0,1]
-
-Constraints:
-- 2 <= nums.length <= 10^4
-- -10^9 <= nums[i] <= 10^9
-- -10^9 <= target <= 10^9
-- Only one valid answer exists.
-    `,
-    difficulty: "Easy",
-    testCases: [
-      {
-        input: "nums = [2,7,11,15], target = 9",
-        output: "[0,1]",
-      },
-      {
-        input: "nums = [3,2,4], target = 6",
-        output: "[1,2]",
-      },
-      {
-        input: "nums = [3,3], target = 6",
-        output: "[0,1]",
-      },
-    ],
-    starterCode: {
-      javascript: `/**
+You can return the answer in any order.`,
+        difficulty: "Easy",
+        tags: ["Array", "Hash Table"],
+        examples: [
+          {
+            input: "nums = [2,7,11,15], target = 9",
+            output: "[0,1]",
+            explanation: "Because nums[0] + nums[1] == 9, we return [0, 1].",
+          },
+          {
+            input: "nums = [3,2,4], target = 6",
+            output: "[1,2]",
+            explanation: "Because nums[1] + nums[2] == 6, we return [1, 2].",
+          },
+        ],
+        constraints: `2 <= nums.length <= 10^4
+-10^9 <= nums[i] <= 10^9
+-10^9 <= target <= 10^9
+Only one valid answer exists.`,
+        hints: [
+          "A really brute force way would be to search for all possible pairs of numbers but that would be too slow. Again, it's best to try out brute force solutions for just for completeness. It is from these brute force solutions that you can come up with optimizations.",
+          "So, if we fix one of the numbers, say x, we have to scan the entire array to find the next number y which is value - x where value is the input parameter. Can we change our array somehow so that this search becomes faster?",
+          "The second train of thought is, without changing the array, can we use additional space somehow? Like maybe a hash map to speed up the search?",
+        ],
+        functionSignatures: [
+          {
+            language: "javascript",
+            functionName: "twoSum",
+            parameters: [
+              { name: "nums", type: "number[]", description: "Array of integers" },
+              { name: "target", type: "number", description: "Target sum" },
+            ],
+            returnType: "number[]",
+            template: `/**
  * @param {number[]} nums
  * @param {number} target
  * @return {number[]}
  */
 function twoSum(nums, target) {
-    // Your code here
+    // Write your solution here
+    // Example: console.log("Debug:", nums, target);
     
+    return []; // Replace with your solution
 }`,
-      python: `class Solution:
-    def twoSum(self, nums: List[int], target: int) -> List[int]:
-        # Your code here
-        pass`,
-      java: `class Solution {
+          },
+          {
+            language: "python",
+            functionName: "twoSum",
+            parameters: [
+              { name: "nums", type: "List[int]", description: "Array of integers" },
+              { name: "target", type: "int", description: "Target sum" },
+            ],
+            returnType: "List[int]",
+            template: `def twoSum(nums, target):
+    """
+    :type nums: List[int]
+    :type target: int
+    :rtype: List[int]
+    """
+    # Write your solution here
+    # Example: print("Debug:", nums, target)
+    
+    return []  # Replace with your solution`,
+          },
+          {
+            language: "java",
+            functionName: "twoSum",
+            parameters: [
+              { name: "nums", type: "int[]", description: "Array of integers" },
+              { name: "target", type: "int", description: "Target sum" },
+            ],
+            returnType: "int[]",
+            template: `class Solution {
     public int[] twoSum(int[] nums, int target) {
-        // Your code here
+        // Write your solution here
+        // Example: System.out.println("Debug: " + Arrays.toString(nums) + ", " + target);
         
+        return new int[]{}; // Replace with your solution
     }
 }`,
-    },
-  },
-  {
-    title: "Valid Parentheses",
-    description: `
-Given a string s containing just the characters '(', ')', '{', '}', '[' and ']', determine if the input string is valid.
-
-An input string is valid if:
-1. Open brackets must be closed by the same type of brackets.
-2. Open brackets must be closed in the correct order.
-3. Every close bracket has a corresponding open bracket of the same type.
-
-Example 1:
-Input: s = "()"
-Output: true
-
-Example 2:
-Input: s = "()[]{}"
-Output: true
-
-Example 3:
-Input: s = "(]"
-Output: false
-
-Constraints:
-- 1 <= s.length <= 10^4
-- s consists of parentheses only '()[]{}'
-    `,
-    difficulty: "Easy",
-    testCases: [
-      {
-        input: 's = "()"',
-        output: "true",
-      },
-      {
-        input: 's = "()[]{}"',
-        output: "true",
-      },
-      {
-        input: 's = "(]"',
-        output: "false",
-      },
-      {
-        input: 's = "([)]"',
-        output: "false",
-      },
-      {
-        input: 's = "{[]}"',
-        output: "true",
-      },
-    ],
-    starterCode: {
-      javascript: `/**
- * @param {string} s
- * @return {boolean}
- */
-function isValid(s) {
-    // Your code here
-    
-}`,
-      python: `class Solution:
-    def isValid(self, s: str) -> bool:
-        # Your code here
-        pass`,
-      java: `class Solution {
-    public boolean isValid(String s) {
-        // Your code here
+          },
+          {
+            language: "cpp",
+            functionName: "twoSum",
+            parameters: [
+              { name: "nums", type: "vector<int>&", description: "Array of integers" },
+              { name: "target", type: "int", description: "Target sum" },
+            ],
+            returnType: "vector<int>",
+            template: `class Solution {
+public:
+    vector<int> twoSum(vector<int>& nums, int target) {
+        // Write your solution here
+        // Example: cout << "Debug: nums size = " << nums.size() << ", target = " << target << endl;
         
+        return {}; // Replace with your solution
     }
-}`,
-    },
-  },
-  {
-    title: "Merge Two Sorted Lists",
-    description: `
-You are given the heads of two sorted linked lists list1 and list2.
-
-Merge the two lists in a one sorted list. The list should be made by splicing together the nodes of the first two lists.
-
-Return the head of the merged linked list.
-
-Example 1:
-Input: list1 = [1,2,4], list2 = [1,3,4]
-Output: [1,1,2,3,4,4]
-
-Example 2:
-Input: list1 = [], list2 = []
-Output: []
-
-Example 3:
-Input: list1 = [], list2 = [0]
-Output: [0]
-
-Constraints:
-- The number of nodes in both lists is in the range [0, 50].
-- -100 <= Node.val <= 100
-- Both list1 and list2 are sorted in non-decreasing order.
-    `,
-    difficulty: "Easy",
-    testCases: [
-      {
-        input: "list1 = [1,2,4], list2 = [1,3,4]",
-        output: "[1,1,2,3,4,4]",
+};`,
+          },
+        ],
+        testCases: [
+          { input: [[2, 7, 11, 15], 9], output: [0, 1] },
+          { input: [[3, 2, 4], 6], output: [1, 2] },
+          { input: [[3, 3], 6], output: [0, 1] },
+          { input: [[1, 2, 3, 4, 5], 9], output: [3, 4] },
+          { input: [[-1, -2, -3, -4, -5], -8], output: [2, 4], isHidden: true },
+        ],
       },
       {
-        input: "list1 = [], list2 = []",
-        output: "[]",
-      },
-      {
-        input: "list1 = [], list2 = [0]",
-        output: "[0]",
-      },
-    ],
-    starterCode: {
-      javascript: `/**
+        title: "Add Two Numbers",
+        description: `You are given two non-empty linked lists representing two non-negative integers. The digits are stored in reverse order, and each of their nodes contains a single digit. Add the two numbers and return the sum as a linked list.
+
+You may assume the two numbers do not contain any leading zero, except the number 0 itself.`,
+        difficulty: "Medium",
+        tags: ["Linked List", "Math", "Recursion"],
+        examples: [
+          {
+            input: "l1 = [2,4,3], l2 = [5,6,4]",
+            output: "[7,0,8]",
+            explanation: "342 + 465 = 807.",
+          },
+          {
+            input: "l1 = [0], l2 = [0]",
+            output: "[0]",
+            explanation: "0 + 0 = 0.",
+          },
+        ],
+        constraints: `The number of nodes in each linked list is in the range [1, 100].
+0 <= Node.val <= 9
+It is guaranteed that the list represents a number that does not have leading zeros.`,
+        functionSignatures: [
+          {
+            language: "javascript",
+            functionName: "addTwoNumbers",
+            parameters: [
+              { name: "l1", type: "ListNode", description: "First linked list" },
+              { name: "l2", type: "ListNode", description: "Second linked list" },
+            ],
+            returnType: "ListNode",
+            template: `/**
  * Definition for singly-linked list.
  * function ListNode(val, next) {
  *     this.val = (val===undefined ? 0 : val)
@@ -202,24 +175,51 @@ Constraints:
  * }
  */
 /**
- * @param {ListNode} list1
- * @param {ListNode} list2
+ * @param {ListNode} l1
+ * @param {ListNode} l2
  * @return {ListNode}
  */
-function mergeTwoLists(list1, list2) {
-    // Your code here
+function addTwoNumbers(l1, l2) {
+    // Write your solution here
+    // Example: console.log("Processing linked lists");
     
+    return null; // Replace with your solution
 }`,
-      python: `# Definition for singly-linked list.
+          },
+          {
+            language: "python",
+            functionName: "addTwoNumbers",
+            parameters: [
+              { name: "l1", type: "ListNode", description: "First linked list" },
+              { name: "l2", type: "ListNode", description: "Second linked list" },
+            ],
+            returnType: "ListNode",
+            template: `# Definition for singly-linked list.
 # class ListNode:
 #     def __init__(self, val=0, next=None):
 #         self.val = val
 #         self.next = next
-class Solution:
-    def mergeTwoLists(self, list1: Optional[ListNode], list2: Optional[ListNode]) -> Optional[ListNode]:
-        # Your code here
-        pass`,
-      java: `/**
+
+def addTwoNumbers(l1, l2):
+    """
+    :type l1: ListNode
+    :type l2: ListNode
+    :rtype: ListNode
+    """
+    # Write your solution here
+    # Example: print("Processing linked lists")
+    
+    return None  # Replace with your solution`,
+          },
+          {
+            language: "java",
+            functionName: "addTwoNumbers",
+            parameters: [
+              { name: "l1", type: "ListNode", description: "First linked list" },
+              { name: "l2", type: "ListNode", description: "Second linked list" },
+            ],
+            returnType: "ListNode",
+            template: `/**
  * Definition for singly-linked list.
  * public class ListNode {
  *     int val;
@@ -230,202 +230,350 @@ class Solution:
  * }
  */
 class Solution {
-    public ListNode mergeTwoLists(ListNode list1, ListNode list2) {
-        // Your code here
+    public ListNode addTwoNumbers(ListNode l1, ListNode l2) {
+        // Write your solution here
+        // Example: System.out.println("Processing linked lists");
         
+        return null; // Replace with your solution
     }
 }`,
-    },
-  },
-  {
-    title: "Maximum Subarray",
-    description: `
-Given an integer array nums, find the contiguous subarray (containing at least one number) which has the largest sum and return its sum.
-
-A subarray is a contiguous part of an array.
-
-Example 1:
-Input: nums = [-2,1,-3,4,-1,2,1,-5,4]
-Output: 6
-Explanation: [4,-1,2,1] has the largest sum = 6.
-
-Example 2:
-Input: nums = [1]
-Output: 1
-
-Example 3:
-Input: nums = [5,4,-1,7,8]
-Output: 23
-
-Constraints:
-- 1 <= nums.length <= 10^5
-- -10^4 <= nums[i] <= 10^4
-    `,
-    difficulty: "Medium",
-    testCases: [
-      {
-        input: "nums = [-2,1,-3,4,-1,2,1,-5,4]",
-        output: "6",
+          },
+        ],
+        testCases: [
+          {
+            input: [
+              [2, 4, 3],
+              [5, 6, 4],
+            ],
+            output: [7, 0, 8],
+          },
+          { input: [[0], [0]], output: [0] },
+          {
+            input: [
+              [9, 9, 9, 9, 9, 9, 9],
+              [9, 9, 9, 9],
+            ],
+            output: [8, 9, 9, 9, 0, 0, 0, 1],
+          },
+        ],
       },
       {
-        input: "nums = [1]",
-        output: "1",
-      },
-      {
-        input: "nums = [5,4,-1,7,8]",
-        output: "23",
-      },
-    ],
-    starterCode: {
-      javascript: `/**
- * @param {number[]} nums
+        title: "Longest Substring Without Repeating Characters",
+        description: `Given a string s, find the length of the longest substring without repeating characters.`,
+        difficulty: "Medium",
+        tags: ["Hash Table", "String", "Sliding Window"],
+        examples: [
+          {
+            input: 's = "abcabcbb"',
+            output: "3",
+            explanation: 'The answer is "abc", with the length of 3.',
+          },
+          {
+            input: 's = "bbbbb"',
+            output: "1",
+            explanation: 'The answer is "b", with the length of 1.',
+          },
+          {
+            input: 's = "pwwkew"',
+            output: "3",
+            explanation: 'The answer is "wke", with the length of 3.',
+          },
+        ],
+        constraints: `0 <= s.length <= 5 * 10^4
+s consists of English letters, digits, symbols and spaces.`,
+        functionSignatures: [
+          {
+            language: "javascript",
+            functionName: "lengthOfLongestSubstring",
+            parameters: [{ name: "s", type: "string", description: "Input string" }],
+            returnType: "number",
+            template: `/**
+ * @param {string} s
  * @return {number}
  */
-function maxSubArray(nums) {
-    // Your code here
+function lengthOfLongestSubstring(s) {
+    // Write your solution here
+    // Example: console.log("Input string:", s);
     
+    return 0; // Replace with your solution
 }`,
-      python: `class Solution:
-    def maxSubArray(self, nums: List[int]) -> int:
-        # Your code here
-        pass`,
-      java: `class Solution {
-    public int maxSubArray(int[] nums) {
-        // Your code here
+          },
+          {
+            language: "python",
+            functionName: "lengthOfLongestSubstring",
+            parameters: [{ name: "s", type: "str", description: "Input string" }],
+            returnType: "int",
+            template: `def lengthOfLongestSubstring(s):
+    """
+    :type s: str
+    :rtype: int
+    """
+    # Write your solution here
+    # Example: print("Input string:", s)
+    
+    return 0  # Replace with your solution`,
+          },
+          {
+            language: "java",
+            functionName: "lengthOfLongestSubstring",
+            parameters: [{ name: "s", type: "String", description: "Input string" }],
+            returnType: "int",
+            template: `class Solution {
+    public int lengthOfLongestSubstring(String s) {
+        // Write your solution here
+        // Example: System.out.println("Input string: " + s);
         
+        return 0; // Replace with your solution
     }
 }`,
-    },
-  },
-  {
-    title: "Binary Search",
-    description: `
-Given an array of integers nums which is sorted in ascending order, and an integer target, write a function to search target in nums. If target exists, then return its index. Otherwise, return -1.
-
-You must write an algorithm with O(log n) runtime complexity.
-
-Example 1:
-Input: nums = [-1,0,3,5,9,12], target = 9
-Output: 4
-Explanation: 9 exists in nums and its index is 4
-
-Example 2:
-Input: nums = [-1,0,3,5,9,12], target = 2
-Output: -1
-Explanation: 2 does not exist in nums so return -1
-
-Constraints:
-- 1 <= nums.length <= 10^4
-- -10^4 < nums[i], target < 10^4
-- All the integers in nums are unique.
-- nums is sorted in ascending order.
-    `,
-    difficulty: "Easy",
-    testCases: [
-      {
-        input: "nums = [-1,0,3,5,9,12], target = 9",
-        output: "4",
+          },
+        ],
+        testCases: [
+          { input: ["abcabcbb"], output: 3 },
+          { input: ["bbbbb"], output: 1 },
+          { input: ["pwwkew"], output: 3 },
+          { input: [""], output: 0 },
+          { input: [" "], output: 1 },
+          { input: ["au"], output: 2, isHidden: true },
+        ],
       },
       {
-        input: "nums = [-1,0,3,5,9,12], target = 2",
-        output: "-1",
-      },
-    ],
-    starterCode: {
-      javascript: `/**
- * @param {number[]} nums
- * @param {number} target
+        title: "Median of Two Sorted Arrays",
+        description: `Given two sorted arrays nums1 and nums2 of size m and n respectively, return the median of the two sorted arrays.
+
+The overall run time complexity should be O(log (m+n)).`,
+        difficulty: "Hard",
+        tags: ["Array", "Binary Search", "Divide and Conquer"],
+        examples: [
+          {
+            input: "nums1 = [1,3], nums2 = [2]",
+            output: "2.00000",
+            explanation: "merged array = [1,2,3] and median is 2.",
+          },
+          {
+            input: "nums1 = [1,2], nums2 = [3,4]",
+            output: "2.50000",
+            explanation: "merged array = [1,2,3,4] and median is (2 + 3) / 2 = 2.5.",
+          },
+        ],
+        constraints: `nums1.length == m
+nums2.length == n
+0 <= m <= 1000
+0 <= n <= 1000
+1 <= m + n <= 2000
+-10^6 <= nums1[i], nums2[i] <= 10^6`,
+        functionSignatures: [
+          {
+            language: "javascript",
+            functionName: "findMedianSortedArrays",
+            parameters: [
+              { name: "nums1", type: "number[]", description: "First sorted array" },
+              { name: "nums2", type: "number[]", description: "Second sorted array" },
+            ],
+            returnType: "number",
+            template: `/**
+ * @param {number[]} nums1
+ * @param {number[]} nums2
  * @return {number}
  */
-function search(nums, target) {
-    // Your code here
+function findMedianSortedArrays(nums1, nums2) {
+    // Write your solution here
+    // Example: console.log("Arrays:", nums1, nums2);
     
+    return 0.0; // Replace with your solution
 }`,
-      python: `class Solution:
-    def search(self, nums: List[int], target: int) -> int:
-        # Your code here
-        pass`,
-      java: `class Solution {
-    public int search(int[] nums, int target) {
-        // Your code here
+          },
+          {
+            language: "python",
+            functionName: "findMedianSortedArrays",
+            parameters: [
+              { name: "nums1", type: "List[int]", description: "First sorted array" },
+              { name: "nums2", type: "List[int]", description: "Second sorted array" },
+            ],
+            returnType: "float",
+            template: `def findMedianSortedArrays(nums1, nums2):
+    """
+    :type nums1: List[int]
+    :type nums2: List[int]
+    :rtype: float
+    """
+    # Write your solution here
+    # Example: print("Arrays:", nums1, nums2)
+    
+    return 0.0  # Replace with your solution`,
+          },
+          {
+            language: "java",
+            functionName: "findMedianSortedArrays",
+            parameters: [
+              { name: "nums1", type: "int[]", description: "First sorted array" },
+              { name: "nums2", type: "int[]", description: "Second sorted array" },
+            ],
+            returnType: "double",
+            template: `class Solution {
+    public double findMedianSortedArrays(int[] nums1, int[] nums2) {
+        // Write your solution here
+        // Example: System.out.println("Arrays: " + Arrays.toString(nums1) + ", " + Arrays.toString(nums2));
         
+        return 0.0; // Replace with your solution
     }
 }`,
-    },
-  },
-]
+          },
+        ],
+        testCases: [
+          { input: [[1, 3], [2]], output: 2.0 },
+          {
+            input: [
+              [1, 2],
+              [3, 4],
+            ],
+            output: 2.5,
+          },
+          {
+            input: [
+              [0, 0],
+              [0, 0],
+            ],
+            output: 0.0,
+          },
+          { input: [[], [1]], output: 1.0 },
+          { input: [[2], []], output: 2.0 },
+        ],
+      },
+      {
+        title: "Valid Parentheses",
+        description: `Given a string s containing just the characters '(', ')', '{', '}', '[' and ']', determine if the input string is valid.
 
-// Sample users
-const users = [
-  {
-    username: "AlgoMaster",
-    email: "algomaster@example.com",
-    password: "password123",
-    rating: 1850,
-    totalMatches: 120,
-    wins: 90,
-    losses: 30,
-  },
-  {
-    username: "CodeNinja",
-    email: "codeninja@example.com",
-    password: "password123",
-    rating: 1780,
-    totalMatches: 95,
-    wins: 65,
-    losses: 30,
-  },
-  {
-    username: "ByteWarrior",
-    email: "bytewarrior@example.com",
-    password: "password123",
-    rating: 1720,
-    totalMatches: 110,
-    wins: 68,
-    losses: 42,
-  },
-  {
-    username: "DataStructureGuru",
-    email: "dsguru@example.com",
-    password: "password123",
-    rating: 1690,
-    totalMatches: 85,
-    wins: 60,
-    losses: 25,
-  },
-  {
-    username: "AlgorithmAce",
-    email: "algoace@example.com",
-    password: "password123",
-    rating: 1650,
-    totalMatches: 75,
-    wins: 49,
-    losses: 26,
-  },
-]
-
-// Seed the database
-const seedDatabase = async () => {
-  try {
-    // Clear existing data
-    await Problem.deleteMany({})
-    await User.deleteMany({})
+An input string is valid if:
+1. Open brackets must be closed by the same type of brackets.
+2. Open brackets must be closed in the correct order.
+3. Every close bracket has a corresponding open bracket of the same type.`,
+        difficulty: "Easy",
+        tags: ["String", "Stack"],
+        examples: [
+          {
+            input: 's = "()"',
+            output: "true",
+          },
+          {
+            input: 's = "()[]{}"',
+            output: "true",
+          },
+          {
+            input: 's = "(]"',
+            output: "false",
+          },
+        ],
+        constraints: `1 <= s.length <= 10^4
+s consists of parentheses only '()[]{}'.`,
+        functionSignatures: [
+          {
+            language: "javascript",
+            functionName: "isValid",
+            parameters: [{ name: "s", type: "string", description: "String containing parentheses" }],
+            returnType: "boolean",
+            template: `/**
+ * @param {string} s
+ * @return {boolean}
+ */
+function isValid(s) {
+    // Write your solution here
+    // Example: console.log("Input:", s);
+    
+    return false; // Replace with your solution
+}`,
+          },
+          {
+            language: "python",
+            functionName: "isValid",
+            parameters: [{ name: "s", type: "str", description: "String containing parentheses" }],
+            returnType: "bool",
+            template: `def isValid(s):
+    """
+    :type s: str
+    :rtype: bool
+    """
+    # Write your solution here
+    # Example: print("Input:", s)
+    
+    return False  # Replace with your solution`,
+          },
+          {
+            language: "java",
+            functionName: "isValid",
+            parameters: [{ name: "s", type: "String", description: "String containing parentheses" }],
+            returnType: "boolean",
+            template: `class Solution {
+    public boolean isValid(String s) {
+        // Write your solution here
+        // Example: System.out.println("Input: " + s);
+        
+        return false; // Replace with your solution
+    }
+}`,
+          },
+        ],
+        testCases: [
+          { input: ["()"], output: true },
+          { input: ["()[]{}"], output: true },
+          { input: ["(]"], output: false },
+          { input: ["([)]"], output: false },
+          { input: ["{[]}"], output: true },
+          { input: ["(("], output: false, isHidden: true },
+        ],
+      },
+    ]
 
     // Insert problems
     await Problem.insertMany(problems)
-    console.log(`${problems.length} problems seeded`)
-
-    // Insert users
-    await User.insertMany(users)
-    console.log(`${users.length} users seeded`)
-
-    console.log("Database seeded successfully")
-    process.exit(0)
+    console.log("✅ Problems seeded successfully")
   } catch (error) {
-    console.error("Error seeding database:", error)
-    process.exit(1)
+    console.error("❌ Error seeding problems:", error)
   }
 }
 
-// Run the seed function
-seedDatabase()
+const seedUsers = async () => {
+  try {
+    // Check if admin user exists
+    const adminExists = await User.findOne({ email: "admin@peerprep.com" })
+
+    if (!adminExists) {
+      const hashedPassword = await bcrypt.hash("admin123", 10)
+
+      const adminUser = new User({
+        username: "admin",
+        email: "admin@peerprep.com",
+        password: hashedPassword,
+        trophies: 1000,
+        statistics: {
+          totalSubmissions: 50,
+          acceptedSubmissions: 35,
+          easyProblemsSolved: 15,
+          mediumProblemsSolved: 15,
+          hardProblemsSolved: 5,
+          currentStreak: 7,
+          longestStreak: 12,
+          totalTrophiesEarned: 900,
+          totalTrophiesLost: 0,
+        },
+      })
+
+      await adminUser.save()
+      console.log("✅ Admin user created successfully")
+    }
+  } catch (error) {
+    console.error("❌ Error seeding users:", error)
+  }
+}
+
+const seedData = async () => {
+  try {
+    await seedProblems()
+    await seedUsers()
+    console.log("🎉 All seed data created successfully!")
+  } catch (error) {
+    console.error("❌ Error seeding data:", error)
+  }
+}
+
+module.exports = { seedData, seedProblems, seedUsers }

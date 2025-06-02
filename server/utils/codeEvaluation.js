@@ -26,15 +26,52 @@ const STATUS_MAPPING = {
   14: "Exec Format Error",
 }
 
-// Simple and reliable driver code templates
-const createDriverCode = (userCode, language, testCase) => {
+// Create problem-specific driver code
+const createProblemDriverCode = (userCode, language, problem, testCase) => {
+  const functionSig = problem.functionSignatures.find((sig) => sig.language === language)
+  if (!functionSig) {
+    throw new Error(`No function signature found for language: ${language}`)
+  }
+
   const input = testCase.input
   const expectedOutput = testCase.output
 
   switch (language.toLowerCase()) {
     case "javascript":
-      return `
-// User's solution function
+      return createJavaScriptDriver(userCode, functionSig, input, expectedOutput)
+    case "python":
+      return createPythonDriver(userCode, functionSig, input, expectedOutput)
+    case "java":
+      return createJavaDriver(userCode, functionSig, input, expectedOutput)
+    case "cpp":
+      return createCppDriver(userCode, functionSig, input, expectedOutput)
+    default:
+      throw new Error(`Unsupported language: ${language}`)
+  }
+}
+
+const createJavaScriptDriver = (userCode, functionSig, input, expectedOutput) => {
+  const { functionName, parameters } = functionSig
+
+  // Parse input based on parameter types
+  const inputValues = Array.isArray(input) ? input : [input]
+  const parameterAssignments = parameters
+    .map((param, index) => {
+      const value = inputValues[index]
+      if (param.type.includes("[]") || param.type === "array") {
+        return `const ${param.name} = ${JSON.stringify(value)};`
+      } else if (param.type === "string") {
+        return `const ${param.name} = ${JSON.stringify(value)};`
+      } else {
+        return `const ${param.name} = ${JSON.stringify(value)};`
+      }
+    })
+    .join("\n  ")
+
+  const functionCall = `${functionName}(${parameters.map((p) => p.name).join(", ")})`
+
+  return `
+// User's solution
 ${userCode}
 
 // Driver code
@@ -42,34 +79,43 @@ try {
   console.log("=== Test Case Execution ===");
   console.log("Input:", ${JSON.stringify(input)});
   
-  // Parse input and call solution
-  const input_data = ${JSON.stringify(input)};
-  let result;
+  // Parse input parameters
+  ${parameterAssignments}
   
-  if (Array.isArray(input_data)) {
-    result = solution(...input_data);
-  } else {
-    result = solution(input_data);
-  }
+  // Call user's function
+  const result = ${functionCall};
   
   console.log("Your Output:", result);
   console.log("Expected Output:", ${JSON.stringify(expectedOutput)});
   console.log("=== End Test Case ===");
   
-  // Output the result for comparison
+  // Output result for comparison
   console.log("RESULT:" + JSON.stringify(result));
 } catch (error) {
-  console.error("Error:", error.message);
+  console.error("Runtime Error:", error.message);
   console.log("RESULT:ERROR");
 }
 `
+}
 
-    case "python":
-      return `
+const createPythonDriver = (userCode, functionSig, input, expectedOutput) => {
+  const { functionName, parameters } = functionSig
+
+  // Parse input based on parameter types
+  const inputValues = Array.isArray(input) ? input : [input]
+  const parameterAssignments = parameters
+    .map((param, index) => {
+      const value = inputValues[index]
+      return `${param.name} = ${JSON.stringify(value)}`
+    })
+    .join("\n    ")
+
+  const functionCall = `${functionName}(${parameters.map((p) => p.name).join(", ")})`
+
+  return `
 import json
-import sys
 
-# User's solution function
+# User's solution
 ${userCode}
 
 # Driver code
@@ -77,87 +123,98 @@ try:
     print("=== Test Case Execution ===")
     print("Input:", ${JSON.stringify(input)})
     
-    # Parse input and call solution
-    input_data = ${JSON.stringify(input)}
+    # Parse input parameters
+    ${parameterAssignments}
     
-    if isinstance(input_data, list):
-        result = solution(*input_data)
-    else:
-        result = solution(input_data)
+    # Call user's function
+    result = ${functionCall}
     
     print("Your Output:", result)
     print("Expected Output:", ${JSON.stringify(expectedOutput)})
     print("=== End Test Case ===")
     
-    # Output the result for comparison
+    # Output result for comparison
     print("RESULT:" + json.dumps(result))
 except Exception as error:
-    print("Error:", str(error))
+    print("Runtime Error:", str(error))
     print("RESULT:ERROR")
 `
+}
 
-    case "java":
-      return `
+const createJavaDriver = (userCode, functionSig, input, expectedOutput) => {
+  const { functionName, parameters, returnType } = functionSig
+
+  // Parse input based on parameter types
+  const inputValues = Array.isArray(input) ? input : [input]
+  const parameterAssignments = parameters
+    .map((param, index) => {
+      const value = inputValues[index]
+      if (param.type === "int[]") {
+        return `int[] ${param.name} = {${value.join(", ")}};`
+      } else if (param.type === "String[]") {
+        return `String[] ${param.name} = {${value.map((v) => `"${v}"`).join(", ")}};`
+      } else if (param.type === "String") {
+        return `String ${param.name} = "${value}";`
+      } else if (param.type === "int") {
+        return `int ${param.name} = ${value};`
+      } else {
+        return `Object ${param.name} = ${JSON.stringify(value)};`
+      }
+    })
+    .join("\n        ")
+
+  const functionCall = `solution.${functionName}(${parameters.map((p) => p.name).join(", ")})`
+
+  return `
 import java.util.*;
-import com.google.gson.Gson;
+import java.util.stream.*;
 
 public class Main {
-    ${
-      userCode.includes("class Solution")
-        ? ""
-        : `
-    // User's solution function
-    ${userCode}
-    `
-    }
-    
     public static void main(String[] args) {
         try {
             System.out.println("=== Test Case Execution ===");
             System.out.println("Input: " + ${JSON.stringify(JSON.stringify(input))});
             
-            Solution sol = new Solution();
-            Gson gson = new Gson();
+            Solution solution = new Solution();
             
-            // Parse input and call solution
-            String inputJson = ${JSON.stringify(JSON.stringify(input))};
-            Object inputData = gson.fromJson(inputJson, Object.class);
+            // Parse input parameters
+            ${parameterAssignments}
             
-            Object result = sol.solution(inputData);
+            // Call user's function
+            ${returnType} result = ${functionCall};
             
             System.out.println("Your Output: " + result);
             System.out.println("Expected Output: " + ${JSON.stringify(JSON.stringify(expectedOutput))});
             System.out.println("=== End Test Case ===");
             
-            // Output the result for comparison
-            System.out.println("RESULT:" + gson.toJson(result));
+            // Output result for comparison
+            if (result instanceof int[]) {
+                System.out.println("RESULT:" + Arrays.toString((int[])result));
+            } else if (result instanceof String[]) {
+                System.out.println("RESULT:" + Arrays.toString((String[])result));
+            } else {
+                System.out.println("RESULT:" + result);
+            }
         } catch (Exception error) {
-            System.err.println("Error: " + error.getMessage());
+            System.err.println("Runtime Error: " + error.getMessage());
             System.out.println("RESULT:ERROR");
         }
     }
 }
 
-${
-  userCode.includes("class Solution")
-    ? userCode
-    : `
-class Solution {
-    public Object solution(Object input) {
-        // Default implementation
-        return null;
-    }
-}
+// User's solution
+${userCode}
 `
 }
-`
 
-    case "cpp":
-      return `
+const createCppDriver = (userCode, functionSig, input, expectedOutput) => {
+  const { functionName, parameters } = functionSig
+
+  return `
 #include <iostream>
 #include <vector>
 #include <string>
-#include <sstream>
+#include <algorithm>
 using namespace std;
 
 // User's solution
@@ -168,32 +225,27 @@ int main() {
         cout << "=== Test Case Execution ===" << endl;
         cout << "Input: " << ${JSON.stringify(JSON.stringify(input))} << endl;
         
-        Solution sol;
+        Solution solution;
         
-        // For simplicity, assume the solution takes basic types
-        auto result = sol.solution();
+        // For C++, we'll use a simplified approach
+        auto result = solution.${functionName}();
         
         cout << "Your Output: " << result << endl;
         cout << "Expected Output: " << ${JSON.stringify(JSON.stringify(expectedOutput))} << endl;
         cout << "=== End Test Case ===" << endl;
         
-        // Output the result for comparison
         cout << "RESULT:" << result << endl;
     } catch (const exception& error) {
-        cerr << "Error: " << error.what() << endl;
+        cerr << "Runtime Error: " << error.what() << endl;
         cout << "RESULT:ERROR" << endl;
     }
     return 0;
 }
 `
-
-    default:
-      throw new Error(`Unsupported language: ${language}`)
-  }
 }
 
 // Enhanced function to evaluate code using Judge0 API
-const evaluateCode = async (code, language, testCases) => {
+const evaluateCode = async (code, language, problem, testCases) => {
   try {
     if (!process.env.JUDGE0_API_KEY) {
       console.log("No Judge0 API key found, using simulation")
@@ -211,8 +263,8 @@ const evaluateCode = async (code, language, testCases) => {
     const results = await Promise.all(
       testCases.map(async (testCase, index) => {
         try {
-          // Create complete executable code
-          const executableCode = createDriverCode(code, language, testCase)
+          // Create problem-specific executable code
+          const executableCode = createProblemDriverCode(code, language, problem, testCase)
 
           const submission = await createSubmission(executableCode, languageId, "")
 
@@ -290,7 +342,7 @@ const evaluateCode = async (code, language, testCases) => {
 }
 
 // Enhanced function to run code against a single test case
-const runCode = async (code, language, testCase) => {
+const runCode = async (code, language, problem, testCase) => {
   try {
     if (!process.env.JUDGE0_API_KEY) {
       console.log("No Judge0 API key found, using simulation")
@@ -304,8 +356,8 @@ const runCode = async (code, language, testCase) => {
 
     console.log(`Running ${language} code`)
 
-    // Create complete executable code
-    const executableCode = createDriverCode(code, language, testCase)
+    // Create problem-specific executable code
+    const executableCode = createProblemDriverCode(code, language, problem, testCase)
 
     // Create submission
     const submission = await createSubmission(executableCode, languageId, "")
@@ -568,44 +620,9 @@ const simulateExecution = (code, testCase) => {
   }
 }
 
-// Function to get language templates
-const getLanguageTemplates = () => {
-  return {
-    javascript: `function solution(nums) {
-  // Write your solution here
-  // Example: console.log("Debug message");
-  
-  return 0; // Replace with your solution
-}`,
-    python: `def solution(nums):
-    # Write your solution here
-    # Example: print("Debug message")
-    
-    return 0 # Replace with your solution`,
-    java: `class Solution {
-    public int solution(Object input) {
-        // Write your solution here
-        // Example: System.out.println("Debug message");
-        
-        return 0; // Replace with your solution
-    }
-}`,
-    cpp: `class Solution {
-public:
-    int solution() {
-        // Write your solution here
-        // Example: cout << "Debug message" << endl;
-        
-        return 0; // Replace with your solution
-    }
-};`,
-  }
-}
-
 module.exports = {
   evaluateCode,
   runCode,
-  getLanguageTemplates,
   LANGUAGE_IDS,
   STATUS_MAPPING,
 }

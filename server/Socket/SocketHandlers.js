@@ -9,6 +9,13 @@ let matchmakingQueue = []
 // Active matches
 const activeMatches = new Map()
 
+// Trophy rewards/penalties for duels
+const DUEL_TROPHY_REWARDS = {
+  win: 25,
+  loss: -15,
+  draw: 0,
+}
+
 // Setup socket handlers
 const setupSocketHandlers = (io) => {
   // Middleware for authentication
@@ -41,15 +48,15 @@ const setupSocketHandlers = (io) => {
   })
 
   io.on("connection", (socket) => {
-    // console.log("User connected:", socket.id)
+    console.log("User connected:", socket.id)
 
     // Join user's room for private messages
     if (socket.user) {
       socket.join(socket.user._id.toString())
-      // console.log(`User ${socket.user.username} joined their room`)
+      console.log(`User ${socket.user.username} joined their room`)
     }
 
-    // Handle matchmaking
+    // Handle matchmaking based on trophies
     socket.on("join_matchmaking", async () => {
       if (!socket.user) {
         socket.emit("error", { message: "Authentication required" })
@@ -64,15 +71,15 @@ const setupSocketHandlers = (io) => {
         return
       }
 
-      // Add user to queue
+      // Add user to queue with trophy-based matchmaking
       matchmakingQueue.push({
         id: userId,
         socketId: socket.id,
-        rating: socket.user.rating,
+        trophies: socket.user.trophies || 100, // Use trophies instead of rating
         joinedAt: new Date(),
       })
 
-      // console.log(`User ${socket.user.username} joined matchmaking queue`)
+      console.log(`User ${socket.user.username} joined matchmaking queue with ${socket.user.trophies} trophies`)
       socket.emit("matchmaking_joined")
 
       // Try to find a match
@@ -91,7 +98,7 @@ const setupSocketHandlers = (io) => {
       // Remove user from queue
       matchmakingQueue = matchmakingQueue.filter((user) => user.id !== userId)
 
-      // console.log(`User ${socket.user.username} left matchmaking queue`)
+      console.log(`User ${socket.user.username} left matchmaking queue`)
       socket.emit("matchmaking_cancelled")
     })
 
@@ -108,8 +115,8 @@ const setupSocketHandlers = (io) => {
       try {
         // Find match
         const match = await Match.findById(matchId)
-          .populate("userA", "username rating")
-          .populate("userB", "username rating")
+          .populate("userA", "username trophies")
+          .populate("userB", "username trophies")
           .populate("problem")
 
         if (!match) {
@@ -125,7 +132,7 @@ const setupSocketHandlers = (io) => {
 
         // Join match room
         socket.join(matchId)
-        // console.log(`User ${socket.user.username} joined match room ${matchId}`)
+        console.log(`User ${socket.user.username} joined match room ${matchId}`)
 
         // Store socket in active matches
         if (!activeMatches.has(matchId)) {
@@ -150,12 +157,12 @@ const setupSocketHandlers = (io) => {
               userA: {
                 id: match.userA._id,
                 username: match.userA.username,
-                rating: match.userA.rating,
+                trophies: match.userA.trophies,
               },
               userB: {
                 id: match.userB._id,
                 username: match.userB.username,
-                rating: match.userB.rating,
+                trophies: match.userB.trophies,
               },
             },
             startTime: match.startTime,
@@ -202,6 +209,12 @@ const setupSocketHandlers = (io) => {
       io.to(opponentId).emit("opponent_code_update", {
         code,
         language,
+      })
+
+      // Also broadcast status
+      socket.to(matchId).emit("opponent_status", {
+        userId,
+        status: "coding",
       })
     })
 
@@ -255,9 +268,98 @@ const setupSocketHandlers = (io) => {
       })
     })
 
+    // Handle match concede via socket
+    socket.on("concede_match", async (data) => {
+      if (!socket.user) {
+        socket.emit("error", { message: "Authentication required" })
+        return
+      }
+
+      const { matchId } = data
+      const userId = socket.user._id.toString()
+
+      try {
+        // Find and update match
+        const match = await Match.findById(matchId)
+        if (!match) {
+          socket.emit("error", { message: "Match not found" })
+          return
+        }
+
+        // Check if user is part of the match
+        if (match.userA.toString() !== userId && match.userB.toString() !== userId) {
+          socket.emit("error", { message: "Not authorized to concede this match" })
+          return
+        }
+
+        // Set opponent as winner
+        const isUserA = match.userA.toString() === userId
+        const winnerId = isUserA ? match.userB : match.userA
+        const loserId = userId
+
+        match.status = "completed"
+        match.winner = winnerId
+        match.endTime = new Date()
+        match.concedeBy = userId
+
+        await match.save()
+
+        // Update trophies for both users
+        const winner = await User.findById(winnerId)
+        const loser = await User.findById(loserId)
+
+        if (winner && loser) {
+          // Winner gains trophies
+          winner.addTrophyHistory(
+            "earned",
+            DUEL_TROPHY_REWARDS.win,
+            `Won duel against ${loser.username}`,
+            null,
+            matchId,
+          )
+          winner.matchesWon += 1
+          winner.matchesPlayed += 1
+
+          // Loser loses trophies
+          loser.addTrophyHistory(
+            "lost",
+            Math.abs(DUEL_TROPHY_REWARDS.loss),
+            `Lost duel to ${winner.username}`,
+            null,
+            matchId,
+          )
+          loser.matchesLost += 1
+          loser.matchesPlayed += 1
+
+          await Promise.all([winner.save(), loser.save()])
+        }
+
+        // Notify both users
+        io.to(matchId).emit("match_completed", {
+          matchId,
+          winner: winnerId,
+          concedeBy: userId,
+          reason: "concede",
+          trophyChanges: {
+            winner: DUEL_TROPHY_REWARDS.win,
+            loser: DUEL_TROPHY_REWARDS.loss,
+          },
+        })
+
+        // Notify opponent specifically
+        socket.to(matchId).emit("opponent_conceded", {
+          matchId,
+          winner: winnerId,
+        })
+      } catch (error) {
+        console.error("Error handling concede:", error)
+        socket.emit("error", { message: "Error processing concede" })
+      }
+    })
+
     // Handle disconnection
     socket.on("disconnect", () => {
-      // console.log("User disconnected:", socket.id)
+      console.log("User disconnected:", socket.id)
 
       if (!socket.user) return
 
@@ -283,7 +385,7 @@ const setupSocketHandlers = (io) => {
     })
   })
 
-  // Function to find a match for a user
+  // Function to find a match for a user based on trophies
   const findMatch = async (socket) => {
     if (matchmakingQueue.length < 2) return
 
@@ -292,20 +394,25 @@ const setupSocketHandlers = (io) => {
 
     if (!userInQueue) return
 
-    // Find a suitable opponent
-    // In a real app, you would use a more sophisticated algorithm
-    // For demo purposes, we'll just find the closest rating
+    // Find a suitable opponent based on trophy difference
     const sortedQueue = [...matchmakingQueue]
       .filter((user) => user.id !== userId)
       .sort((a, b) => {
-        const ratingDiffA = Math.abs(a.rating - userInQueue.rating)
-        const ratingDiffB = Math.abs(b.rating - userInQueue.rating)
-        return ratingDiffA - ratingDiffB
+        const trophyDiffA = Math.abs(a.trophies - userInQueue.trophies)
+        const trophyDiffB = Math.abs(b.trophies - userInQueue.trophies)
+        return trophyDiffA - trophyDiffB
       })
 
     if (sortedQueue.length === 0) return
 
     const opponent = sortedQueue[0]
+
+    // Only match if trophy difference is reasonable (within 200 trophies)
+    const trophyDifference = Math.abs(opponent.trophies - userInQueue.trophies)
+    if (trophyDifference > 200) {
+      console.log(`No suitable opponent found for ${socket.user.username} (trophy difference too large)`)
+      return
+    }
 
     // Remove both users from queue
     matchmakingQueue = matchmakingQueue.filter((user) => user.id !== userId && user.id !== opponent.id)
@@ -338,7 +445,7 @@ const setupSocketHandlers = (io) => {
       ])
 
       // Get opponent details
-      const opponentUser = await User.findById(opponent.id).select("username rating")
+      const opponentUser = await User.findById(opponent.id).select("username trophies")
 
       // Notify both users
       io.to(socket.id).emit("match_found", {
@@ -346,7 +453,7 @@ const setupSocketHandlers = (io) => {
         opponent: {
           id: opponentUser._id,
           username: opponentUser.username,
-          rating: opponentUser.rating,
+          trophies: opponentUser.trophies,
         },
       })
 
@@ -355,11 +462,13 @@ const setupSocketHandlers = (io) => {
         opponent: {
           id: socket.user._id,
           username: socket.user.username,
-          rating: socket.user.rating,
+          trophies: socket.user.trophies,
         },
       })
 
-      // console.log(`Match created between ${socket.user.username} and ${opponentUser.username}`)
+      console.log(
+        `Match created between ${socket.user.username} (${socket.user.trophies} trophies) and ${opponentUser.username} (${opponentUser.trophies} trophies)`,
+      )
     } catch (error) {
       console.error("Error creating match:", error)
 
