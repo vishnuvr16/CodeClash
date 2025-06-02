@@ -2,10 +2,9 @@ const express = require("express")
 const router = express.Router()
 const User = require("../models/User")
 const Match = require("../models/Match")
-const auth = require("../middleware/auth")
-
+const { authenticateToken } = require("../middleware/auth")
 // Get leaderboard with enhanced statistics
-router.get("/", auth, async (req, res) => {
+router.get("/", authenticateToken, async (req, res) => {
   try {
     const { limit = 50, search } = req.query
 

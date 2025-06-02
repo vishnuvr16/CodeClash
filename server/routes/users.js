@@ -3,12 +3,12 @@ const bcrypt = require("bcryptjs")
 const jwt = require("jsonwebtoken")
 const User = require("../models/User")
 const Match = require("../models/Match")
-const auth = require("../middleware/auth")
+const { authenticateToken } = require("../middleware/auth")
 
 const router = express.Router()
 
 // Get user profile
-router.get("/profile", auth, async (req, res) => {
+router.get("/profile", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-password")
     if (!user) {
@@ -34,7 +34,7 @@ router.get("/profile", auth, async (req, res) => {
 })
 
 // Get user's trophy history
-router.get("/trophy-history", auth, async (req, res) => {
+router.get("/trophy-history", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.id)
       .populate("trophyHistory.problemId", "title difficulty")
@@ -70,7 +70,7 @@ router.get("/trophy-history", auth, async (req, res) => {
 })
 
 // Update user profile
-router.put("/profile", auth, async (req, res) => {
+router.put("/profile", authenticateToken, async (req, res) => {
   try {
     const { username, email, preferences } = req.body
     const user = await User.findById(req.user.id)
@@ -121,7 +121,7 @@ router.put("/profile", auth, async (req, res) => {
 })
 
 // Get user's recent matches
-router.get("/:userId/recent-matches", auth, async (req, res) => {
+router.get("/:userId/recent-matches", authenticateToken, async (req, res) => {
   try {
     const { userId } = req.params
     const { limit = 5 } = req.query
