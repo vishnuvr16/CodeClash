@@ -359,6 +359,33 @@ router.post("/problems/:id/submit", authenticateToken, async (req, res) => {
   }
 })
 
+// Get user's submissions for a problem
+router.get("/problems/:id/submissions", authenticateToken, async (req, res) => {
+  try {
+    const problemId = req.params.id
+    const userId = req.user._id
+
+    const user = await User.findById(userId)
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" })
+    }
+
+    const submissions =
+      user.submissions && Array.isArray(user.submissions)
+        ? user.submissions
+            .filter((sub) => sub.problemId && sub.problemId.toString() === problemId)
+            .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))
+            .slice(0, 20) // Last 20 submissions
+        : []
+
+    res.json({ submissions })
+  } catch (error) {
+    console.error("Error fetching submissions:", error)
+    res.status(500).json({ message: "Server error", error: error.message })
+  }
+})
+
 // Get user's practice statistics
 router.get("/stats", authenticateToken, async (req, res) => {
   try {
