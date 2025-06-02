@@ -28,9 +28,17 @@ const STATUS_MAPPING = {
 
 // Create problem-specific driver code
 const createProblemDriverCode = (userCode, language, problem, testCase) => {
-  const functionSig = problem.functionSignatures.find((sig) => sig.language === language)
+  let functionSig = problem.functionSignatures?.find((sig) => sig.language === language)
+
+  // If no function signature found, create a default one
   if (!functionSig) {
-    throw new Error(`No function signature found for language: ${language}`)
+    console.log(`No function signature found for ${language}, using default`)
+    functionSig = {
+      language: language,
+      functionName: "solution",
+      parameters: [{ name: "input", type: "any", description: "Input parameter" }],
+      returnType: "any",
+    }
   }
 
   const input = testCase.input

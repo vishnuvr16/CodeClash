@@ -3,7 +3,6 @@ const Problem = require("../models/Problem")
 const User = require("../models/User")
 const { evaluateCode, runCode } = require("../utils/codeEvaluation")
 const { authenticateToken } = require("../middleware/auth")
-
 const router = express.Router()
 
 // Trophy rewards for different difficulties
@@ -151,6 +150,53 @@ router.post("/problems/:id/run", authenticateToken, async (req, res) => {
       })
     }
 
+    // Check if problem has function signatures, if not, create default ones
+    if (!problem.functionSignatures || problem.functionSignatures.length === 0) {
+      // Create default function signatures for backward compatibility
+      problem.functionSignatures = [
+        {
+          language: "javascript",
+          functionName: "solution",
+          parameters: [{ name: "input", type: "any", description: "Input parameter" }],
+          returnType: "any",
+          template: `function solution(input) {
+    // Write your solution here
+    console.log("Input:", input);
+    
+    return null; // Replace with your solution
+}`,
+        },
+        {
+          language: "python",
+          functionName: "solution",
+          parameters: [{ name: "input", type: "any", description: "Input parameter" }],
+          returnType: "any",
+          template: `def solution(input):
+    # Write your solution here
+    print("Input:", input)
+    
+    return None  # Replace with your solution`,
+        },
+        {
+          language: "java",
+          functionName: "solution",
+          parameters: [{ name: "input", type: "Object", description: "Input parameter" }],
+          returnType: "Object",
+          template: `class Solution {
+    public Object solution(Object input) {
+        // Write your solution here
+        System.out.println("Input: " + input);
+        
+        return null; // Replace with your solution
+    }
+}`,
+        },
+      ]
+
+      // Save the updated problem
+      await problem.save()
+    }
+
     // Use only the first test case for running (example)
     const testCase = problem.testCases[0]
 
@@ -205,6 +251,53 @@ router.post("/problems/:id/submit", authenticateToken, async (req, res) => {
         success: false,
         message: "Problem not found",
       })
+    }
+
+    // Check if problem has function signatures, if not, create default ones
+    if (!problem.functionSignatures || problem.functionSignatures.length === 0) {
+      // Create default function signatures for backward compatibility
+      problem.functionSignatures = [
+        {
+          language: "javascript",
+          functionName: "solution",
+          parameters: [{ name: "input", type: "any", description: "Input parameter" }],
+          returnType: "any",
+          template: `function solution(input) {
+    // Write your solution here
+    console.log("Input:", input);
+    
+    return null; // Replace with your solution
+}`,
+        },
+        {
+          language: "python",
+          functionName: "solution",
+          parameters: [{ name: "input", type: "any", description: "Input parameter" }],
+          returnType: "any",
+          template: `def solution(input):
+    # Write your solution here
+    print("Input:", input)
+    
+    return None  # Replace with your solution`,
+        },
+        {
+          language: "java",
+          functionName: "solution",
+          parameters: [{ name: "input", type: "Object", description: "Input parameter" }],
+          returnType: "Object",
+          template: `class Solution {
+    public Object solution(Object input) {
+        // Write your solution here
+        System.out.println("Input: " + input);
+        
+        return null; // Replace with your solution
+    }
+}`,
+        },
+      ]
+
+      // Save the updated problem
+      await problem.save()
     }
 
     // Evaluate code against all test cases with problem-specific driver
