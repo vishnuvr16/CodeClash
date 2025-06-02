@@ -22,8 +22,13 @@ import SettingsPage from "./pages/SettingsPage"
 import NotFoundPage from "./pages/NotFoundPage"
 
 // Protected Route Component
-import ProtectedRoute from "./components/ProtectedRoute"
-
+const ProtectedRoute = ({ children }) => {
+  const token = localStorage.getItem("token")
+  if (!token) {
+    return <Navigate to="/login" replace />
+  }
+  return children
+}
 function App() {
   return (
     <AuthProvider>
