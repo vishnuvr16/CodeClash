@@ -2,120 +2,57 @@ const express = require("express")
 const router = express.Router()
 const User = require("../models/User")
 const Match = require("../models/Match")
+const auth = require("../middleware/auth")
 
 // Get leaderboard with enhanced statistics
-router.get("/", async (req, res) => {
+router.get("/", auth, async (req, res) => {
   try {
-    const {
-      timeFilter = "all", // all, week, month
-      sortBy = "rating", // rating, winRate, matches
-      order = "desc",
-      limit = 50,
-      search,
-    } = req.query
+    const { limit = 50, search } = req.query
 
-    // Build time filter for matches
-    const matchTimeFilter = {}
-    const now = new Date()
-
-    if (timeFilter === "week") {
-      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-      matchTimeFilter.createdAt = { $gte: weekAgo }
-    } else if (timeFilter === "month") {
-      const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-      matchTimeFilter.createdAt = { $gte: monthAgo }
-    }
-
-    // Build user filter for search
-    const userFilter = {}
+    // Build query
+    const query = {}
     if (search) {
-      userFilter.username = { $regex: search, $options: "i" }
+      query.username = { $regex: search, $options: "i" }
     }
 
-    // Get all users with basic info
-    const users = await User.find(userFilter).select("username rating createdAt").lean()
+    // Get users sorted by trophies
+    const users = await User.find(query)
+      .select("username trophies matchesPlayed matchesWon matchesLost")
+      .sort({ trophies: -1 })
+      .limit(Number.parseInt(limit))
 
-    // Calculate detailed statistics for each user
-    const leaderboardData = await Promise.all(
-      users.map(async (user) => {
-        // Get user's matches based on time filter
-        const userMatches = await Match.find({
-          ...matchTimeFilter,
-          $or: [{ userA: user._id }, { userB: user._id }],
-          status: "completed",
-        }).lean()
+    // Calculate additional stats for each user
+    const leaderboard = users.map((user, index) => ({
+      _id: user._id,
+      username: user.username,
+      trophies: user.trophies || 0,
+      matchesPlayed: user.matchesPlayed || 0,
+      winRate: user.matchesPlayed > 0 ? Math.round((user.matchesWon / user.matchesPlayed) * 100) : 0,
+      rank: index + 1,
+    }))
 
-        // Calculate statistics
-        const matchesPlayed = userMatches.length
-        const matchesWon = userMatches.filter((match) => {
-          return match.winner && match.winner.toString() === user._id.toString()
-        }).length
-        const matchesLost = matchesPlayed - matchesWon
-        const winRate = matchesPlayed > 0 ? Math.round((matchesWon / matchesPlayed) * 100) : 0
-
-        // Calculate rating change (last 10 matches)
-        const recentMatches = userMatches.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 10)
-
-        let ratingChange = 0
-        if (recentMatches.length > 1) {
-          // This is a simplified calculation - in a real app you'd track rating history
-          const recentWins = recentMatches.filter(
-            (match) => match.winner && match.winner.toString() === user._id.toString(),
-          ).length
-          const recentWinRate = recentWins / recentMatches.length
-          ratingChange = recentWinRate > 0.5 ? Math.floor(Math.random() * 50) + 10 : -Math.floor(Math.random() * 30) - 5
-        }
-
-        return {
-          _id: user._id,
-          username: user.username,
-          rating: user.rating || 1200,
-          matchesPlayed,
-          matchesWon,
-          matchesLost,
-          winRate,
-          ratingChange,
-          createdAt: user.createdAt,
-        }
-      }),
-    )
-
-    // Sort the leaderboard
-    const sortOrder = order === "asc" ? 1 : -1
-    leaderboardData.sort((a, b) => {
-      if (sortBy === "rating") {
-        return (b.rating - a.rating) * sortOrder
-      } else if (sortBy === "winRate") {
-        return (b.winRate - a.winRate) * sortOrder
-      } else if (sortBy === "matches") {
-        return (b.matchesPlayed - a.matchesPlayed) * sortOrder
-      }
-      return 0
-    })
-
-    // Apply limit
-    const limitedLeaderboard = leaderboardData.slice(0, Number.parseInt(limit))
-
-    // Find current user's rank if authenticated
+    // Get current user's rank if authenticated
     let userRank = null
     if (req.user) {
-      const userIndex = leaderboardData.findIndex((user) => user._id.toString() === req.user.id)
-      if (userIndex !== -1) {
+      const currentUser = await User.findById(req.user.id)
+      if (currentUser) {
+        const userPosition = await User.countDocuments({
+          trophies: { $gt: currentUser.trophies },
+        })
+
         userRank = {
-          rank: userIndex + 1,
-          ...leaderboardData[userIndex],
+          rank: userPosition + 1,
+          trophies: currentUser.trophies,
+          winRate:
+            currentUser.matchesPlayed > 0 ? Math.round((currentUser.matchesWon / currentUser.matchesPlayed) * 100) : 0,
         }
       }
     }
 
     res.json({
       success: true,
-      leaderboard: limitedLeaderboard,
+      leaderboard,
       userRank,
-      totalUsers: leaderboardData.length,
-      timeFilter,
-      sortBy,
-      order,
     })
   } catch (error) {
     console.error("Error fetching leaderboard:", error)

@@ -1,9 +1,17 @@
 const express = require("express")
 const Problem = require("../models/Problem")
 const User = require("../models/User")
+const auth = require("../middleware/auth")
 const { evaluateCode, runCode } = require("../utils/codeEvaluation")
-const { authenticateToken } = require("../middleware/auth")
+
 const router = express.Router()
+
+// Trophy rewards for different difficulties
+const TROPHY_REWARDS = {
+  Easy: 5,
+  Medium: 10,
+  Hard: 15,
+}
 
 // Get all practice problems with filtering, sorting, and pagination
 router.get("/problems", async (req, res) => {
@@ -36,11 +44,7 @@ router.get("/problems", async (req, res) => {
     const skip = (pageNum - 1) * limitNum
 
     // Get problems with pagination
-    const problems = await Problem.find(filter)
-      .sort(sort)
-      .skip(skip)
-      .limit(limitNum)
-      .select("-testCases.isHidden -testCases.output")
+    const problems = await Problem.find(filter).sort(sort).skip(skip).limit(limitNum).select("-testCases")
 
     // Get total count for pagination
     const totalProblems = await Problem.countDocuments(filter)
@@ -49,14 +53,17 @@ router.get("/problems", async (req, res) => {
     // If user is authenticated, check which problems they've solved
     let solvedProblems = []
     if (req.user) {
-      const user = await User.findById(req.user.id).populate("solvedProblems")
-      solvedProblems = user.solvedProblems.map((p) => p._id.toString())
+      const user = await User.findById(req.user.id)
+      if (user && user.solvedProblems) {
+        solvedProblems = user.solvedProblems.map((sp) => sp.problemId.toString())
+      }
     }
 
     // Add isSolved flag to each problem
     const problemsWithSolvedStatus = problems.map((problem) => ({
       ...problem.toObject(),
       isSolved: solvedProblems.includes(problem._id.toString()),
+      trophyReward: TROPHY_REWARDS[problem.difficulty] || 0,
     }))
 
     res.json({
@@ -113,11 +120,13 @@ router.get("/problems/:id", async (req, res) => {
     let isSolved = false
     if (req.user) {
       const user = await User.findById(req.user.id)
-      isSolved = user.solvedProblems.includes(id)
+      if (user && user.solvedProblems) {
+        isSolved = user.solvedProblems.some((sp) => sp.problemId.toString() === id)
+      }
     }
 
-    // Filter out hidden test cases for public view
-    const publicTestCases = problem.testCases.filter((tc) => !tc.isHidden)
+    // Only show first 2 test cases as examples
+    const publicTestCases = problem.testCases.slice(0, 2)
 
     res.json({
       success: true,
@@ -125,6 +134,7 @@ router.get("/problems/:id", async (req, res) => {
         ...problem.toObject(),
         testCases: publicTestCases,
         isSolved,
+        trophyReward: TROPHY_REWARDS[problem.difficulty] || 0,
       },
     })
   } catch (error) {
@@ -138,7 +148,7 @@ router.get("/problems/:id", async (req, res) => {
 })
 
 // Run code against a single test case (for testing)
-router.post("/problems/:id/run", authenticateToken, async (req, res) => {
+router.post("/problems/:id/run", auth, async (req, res) => {
   try {
     const { id } = req.params
     const { code, language, testCaseIndex = 0 } = req.body
@@ -159,23 +169,18 @@ router.post("/problems/:id/run", authenticateToken, async (req, res) => {
       })
     }
 
-    // Get the test case (use public test cases only)
-    const publicTestCases = problem.testCases.filter((tc) => !tc.isHidden)
+    // Use only the first test case for running (example)
+    const testCase = problem.testCases[0]
 
-    if (testCaseIndex >= publicTestCases.length) {
+    if (!testCase) {
       return res.status(400).json({
         success: false,
-        message: "Invalid test case index",
+        message: "No test cases available",
       })
     }
 
-    const testCase = publicTestCases[testCaseIndex]
-
     // Run the code
-    const result = await runCode(code, language, {
-      input: testCase.input,
-      output: testCase.output,
-    })
+    const result = await runCode(code, language, testCase)
 
     if (!result.success) {
       return res.status(400).json({
@@ -199,7 +204,7 @@ router.post("/problems/:id/run", authenticateToken, async (req, res) => {
 })
 
 // Submit solution for a practice problem
-router.post("/problems/:id/submit", authenticateToken, async (req, res) => {
+router.post("/problems/:id/submit", auth, async (req, res) => {
   try {
     const { id } = req.params
     const { code, language } = req.body
@@ -232,13 +237,100 @@ router.post("/problems/:id/submit", authenticateToken, async (req, res) => {
 
     const isCorrect = evaluation.allPassed
 
-    // If solution is correct, update user's solved problems
-    if (isCorrect) {
-      const user = await User.findById(req.user.id)
+    // Update user record
+    const user = await User.findById(req.user.id)
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      })
+    }
 
-      if (!user.solvedProblems.includes(id)) {
-        user.solvedProblems.push(id)
-        await user.save()
+    // Initialize arrays and statistics if they don't exist
+    if (!user.submissions) user.submissions = []
+    if (!user.solvedProblems) user.solvedProblems = []
+    if (!user.statistics) {
+      user.statistics = {
+        totalSubmissions: 0,
+        acceptedSubmissions: 0,
+        easyProblemsSolved: 0,
+        mediumProblemsSolved: 0,
+        hardProblemsSolved: 0,
+        currentStreak: 0,
+        longestStreak: 0,
+        totalTrophiesEarned: 0,
+        totalTrophiesLost: 0,
+      }
+    }
+
+    // Create submission record
+    const submission = {
+      problemId: id,
+      code,
+      language,
+      status: isCorrect ? "Accepted" : "Wrong Answer",
+      submittedAt: new Date(),
+      testResults: evaluation.results.map((r) => ({
+        input: r.input,
+        expectedOutput: r.expectedOutput,
+        actualOutput: r.actualOutput,
+        passed: r.passed,
+        executionTime: r.executionTime,
+      })),
+    }
+
+    user.submissions.push(submission)
+    user.statistics.totalSubmissions += 1
+
+    let trophiesEarned = 0
+
+    if (isCorrect) {
+      user.statistics.acceptedSubmissions += 1
+
+      // Check if this is the first time solving this problem
+      const alreadySolved = user.solvedProblems.some((sp) => sp.problemId.toString() === id)
+
+      if (!alreadySolved) {
+        // Award trophies based on difficulty
+        trophiesEarned = TROPHY_REWARDS[problem.difficulty] || 0
+
+        user.solvedProblems.push({
+          problemId: id,
+          solvedAt: new Date(),
+          language,
+          code,
+          trophiesEarned,
+        })
+
+        // Add trophy history
+        user.addTrophyHistory("earned", trophiesEarned, `Solved ${problem.difficulty} problem: ${problem.title}`, id)
+
+        // Update difficulty-specific counters
+        if (problem.difficulty === "Easy") {
+          user.statistics.easyProblemsSolved += 1
+        } else if (problem.difficulty === "Medium") {
+          user.statistics.mediumProblemsSolved += 1
+        } else if (problem.difficulty === "Hard") {
+          user.statistics.hardProblemsSolved += 1
+        }
+
+        // Update streak
+        const today = new Date()
+        const lastSolved = user.statistics.lastSolvedDate
+
+        if (lastSolved) {
+          const daysDiff = Math.floor((today - lastSolved) / (1000 * 60 * 60 * 24))
+          if (daysDiff === 0 || daysDiff === 1) {
+            user.statistics.currentStreak += 1
+          } else if (daysDiff > 1) {
+            user.statistics.currentStreak = 1
+          }
+        } else {
+          user.statistics.currentStreak = 1
+        }
+
+        user.statistics.longestStreak = Math.max(user.statistics.longestStreak, user.statistics.currentStreak)
+        user.statistics.lastSolvedDate = today
 
         // Increment problem's solved count
         await Problem.findByIdAndUpdate(id, {
@@ -247,11 +339,16 @@ router.post("/problems/:id/submit", authenticateToken, async (req, res) => {
       }
     }
 
+    await user.save()
+
     res.json({
       success: true,
       isCorrect,
-      evaluation,
-      message: isCorrect ? "Congratulations! Solution accepted." : "Solution incorrect. Please try again.",
+      results: evaluation.results,
+      trophiesEarned,
+      message: isCorrect
+        ? `Congratulations! Solution accepted. ${trophiesEarned > 0 ? `You earned ${trophiesEarned} trophies!` : ""}`
+        : "Solution incorrect. Please try again.",
     })
   } catch (error) {
     console.error("Error submitting solution:", error)
@@ -263,45 +360,21 @@ router.post("/problems/:id/submit", authenticateToken, async (req, res) => {
   }
 })
 
-// Get user's submissions for a problem
-router.get("/problems/:id/submissions", authenticateToken, async (req, res) => {
-  try {
-    const problemId = req.params.id
-    const userId = req.user._id
-
-    const user = await User.findById(userId)
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" })
-    }
-
-    const submissions =
-      user.submissions && Array.isArray(user.submissions)
-        ? user.submissions
-            .filter((sub) => sub.problemId && sub.problemId.toString() === problemId)
-            .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))
-            .slice(0, 20) // Last 20 submissions
-        : []
-
-    res.json({ submissions })
-  } catch (error) {
-    console.error("Error fetching submissions:", error)
-    res.status(500).json({ message: "Server error", error: error.message })
-  }
-})
-
-
 // Get user's practice statistics
-router.get("/stats", authenticateToken, async (req, res) => {
+router.get("/stats", auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).populate("solvedProblems")
+    const user = await User.findById(req.user.id).populate("solvedProblems.problemId")
 
     const stats = {
       totalSolved: user.solvedProblems.length,
-      easySolved: user.solvedProblems.filter((p) => p.difficulty === "Easy").length,
-      mediumSolved: user.solvedProblems.filter((p) => p.difficulty === "Medium").length,
-      hardSolved: user.solvedProblems.filter((p) => p.difficulty === "Hard").length,
-      recentlySolved: user.solvedProblems.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5),
+      easySolved: user.statistics.easyProblemsSolved || 0,
+      mediumSolved: user.statistics.mediumProblemsSolved || 0,
+      hardSolved: user.statistics.hardProblemsSolved || 0,
+      totalTrophies: user.trophies,
+      trophiesEarned: user.statistics.totalTrophiesEarned || 0,
+      currentStreak: user.statistics.currentStreak || 0,
+      longestStreak: user.statistics.longestStreak || 0,
+      recentlySolved: user.solvedProblems.sort((a, b) => new Date(b.solvedAt) - new Date(a.solvedAt)).slice(0, 5),
     }
 
     res.json({

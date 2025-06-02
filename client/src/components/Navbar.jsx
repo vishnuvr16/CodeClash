@@ -80,7 +80,7 @@ const Navbar = () => {
                   <Code className="h-5 w-5 text-white" />
                 </div>
                 <span className="text-xl font-bold text-white">
-                  PeerPrep<span className="text-purple-400">Duel</span>
+                  Code<span className="text-purple-400">Clash</span>
                 </span>
               </div>
             </Link>
@@ -137,7 +137,7 @@ const Navbar = () => {
                     </div>
                     <Link
                       to="/dashboard"
-                      className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center transition-colors"
+                      className=" px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center transition-colors"
                       onClick={() => setIsProfileOpen(false)}
                     >
                       <User className="mr-3 h-4 w-4" />
@@ -145,7 +145,7 @@ const Navbar = () => {
                     </Link>
                     <Link
                       to="/practice"
-                      className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center transition-colors"
+                      className=" px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center transition-colors"
                       onClick={() => setIsProfileOpen(false)}
                     >
                       <Code className="mr-3 h-4 w-4" />
@@ -153,7 +153,7 @@ const Navbar = () => {
                     </Link>
                     <Link
                       to="/settings"
-                      className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center transition-colors"
+                      className=" px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center transition-colors"
                       onClick={() => setIsProfileOpen(false)}
                     >
                       <Settings className="mr-3 h-4 w-4" />
@@ -161,7 +161,7 @@ const Navbar = () => {
                     </Link>
                     <button
                       onClick={handleLogout}
-                      className="w-full text-left block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center transition-colors border-t border-gray-700 mt-1"
+                      className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center transition-colors border-t border-gray-700 mt-1"
                     >
                       <LogOut className="mr-3 h-4 w-4" />
                       Sign out

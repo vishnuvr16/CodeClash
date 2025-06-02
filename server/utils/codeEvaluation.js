@@ -6,10 +6,6 @@ const LANGUAGE_IDS = {
   python: 71, // Python 3
   java: 62, // Java
   cpp: 54, // C++
-  c: 50, // C
-  csharp: 51, // C#
-  go: 60, // Go
-  rust: 73, // Rust
 }
 
 // Status mapping for Judge0 responses
@@ -30,144 +26,170 @@ const STATUS_MAPPING = {
   14: "Exec Format Error",
 }
 
-// Driver code templates for different languages
-const DRIVER_TEMPLATES = {
-  javascript: (userCode, testCase) => {
-    const input = JSON.stringify(testCase.input)
-    return `
-// User solution
+// Simple and reliable driver code templates
+const createDriverCode = (userCode, language, testCase) => {
+  const input = testCase.input
+  const expectedOutput = testCase.output
+
+  switch (language.toLowerCase()) {
+    case "javascript":
+      return `
+// User's solution function
 ${userCode}
 
 // Driver code
-function runTest() {
-  console.log("Input:", ${input});
+try {
+  console.log("=== Test Case Execution ===");
+  console.log("Input:", ${JSON.stringify(input)});
   
-  // Parse input if needed
-  const parsedInput = ${input};
+  // Parse input and call solution
+  const input_data = ${JSON.stringify(input)};
+  let result;
   
-  // Call the solution function with the parsed input
-  const result = solution(...parsedInput);
+  if (Array.isArray(input_data)) {
+    result = solution(...input_data);
+  } else {
+    result = solution(input_data);
+  }
   
-  console.log("Your output:", result);
-  console.log("Expected output:", ${JSON.stringify(testCase.output)});
+  console.log("Your Output:", result);
+  console.log("Expected Output:", ${JSON.stringify(expectedOutput)});
+  console.log("=== End Test Case ===");
   
-  return result;
+  // Output the result for comparison
+  console.log("RESULT:" + JSON.stringify(result));
+} catch (error) {
+  console.error("Error:", error.message);
+  console.log("RESULT:ERROR");
 }
-
-// Execute test
-runTest();
 `
-  },
 
-  python: (userCode, testCase) => {
-    const input = JSON.stringify(testCase.input)
-    return `
-# User solution
+    case "python":
+      return `
+import json
+import sys
+
+# User's solution function
 ${userCode}
 
 # Driver code
-def run_test():
-    print("Input:", ${input})
+try:
+    print("=== Test Case Execution ===")
+    print("Input:", ${JSON.stringify(input)})
     
-    # Parse input if needed
-    parsed_input = ${input}
+    # Parse input and call solution
+    input_data = ${JSON.stringify(input)}
     
-    # Call the solution function with the parsed input
-    result = solution(*parsed_input)
+    if isinstance(input_data, list):
+        result = solution(*input_data)
+    else:
+        result = solution(input_data)
     
-    print("Your output:", result)
-    print("Expected output:", ${JSON.stringify(testCase.output)})
+    print("Your Output:", result)
+    print("Expected Output:", ${JSON.stringify(expectedOutput)})
+    print("=== End Test Case ===")
     
-    return result
-
-# Execute test
-run_test()
+    # Output the result for comparison
+    print("RESULT:" + json.dumps(result))
+except Exception as error:
+    print("Error:", str(error))
+    print("RESULT:ERROR")
 `
-  },
 
-  java: (userCode, testCase) => {
-    const input = JSON.stringify(testCase.input)
-    return `
+    case "java":
+      return `
 import java.util.*;
+import com.google.gson.Gson;
 
 public class Main {
-    // User solution
+    ${
+      userCode.includes("class Solution")
+        ? ""
+        : `
+    // User's solution function
     ${userCode}
+    `
+    }
     
-    // Driver code
     public static void main(String[] args) {
-        System.out.println("Input: " + ${input});
-        
-        // Parse input if needed
-        String[] inputArray = ${input}.toString().replaceAll("\\\\[|\\\\]", "").split(",");
-        
-        // Call the solution method
-        Solution solution = new Solution();
-        Object result = solution.solution(inputArray);
-        
-        System.out.println("Your output: " + result);
-        System.out.println("Expected output: " + ${JSON.stringify(testCase.output)});
+        try {
+            System.out.println("=== Test Case Execution ===");
+            System.out.println("Input: " + ${JSON.stringify(JSON.stringify(input))});
+            
+            Solution sol = new Solution();
+            Gson gson = new Gson();
+            
+            // Parse input and call solution
+            String inputJson = ${JSON.stringify(JSON.stringify(input))};
+            Object inputData = gson.fromJson(inputJson, Object.class);
+            
+            Object result = sol.solution(inputData);
+            
+            System.out.println("Your Output: " + result);
+            System.out.println("Expected Output: " + ${JSON.stringify(JSON.stringify(expectedOutput))});
+            System.out.println("=== End Test Case ===");
+            
+            // Output the result for comparison
+            System.out.println("RESULT:" + gson.toJson(result));
+        } catch (Exception error) {
+            System.err.println("Error: " + error.getMessage());
+            System.out.println("RESULT:ERROR");
+        }
     }
 }
 
+${
+  userCode.includes("class Solution")
+    ? userCode
+    : `
 class Solution {
-    ${userCode.includes("public") ? "" : "public Object solution(String[] args) { return null; }"}
+    public Object solution(Object input) {
+        // Default implementation
+        return null;
+    }
 }
 `
-  },
+}
+`
 
-  cpp: (userCode, testCase) => {
-    const input = JSON.stringify(testCase.input)
-    return `
+    case "cpp":
+      return `
 #include <iostream>
 #include <vector>
 #include <string>
+#include <sstream>
 using namespace std;
 
-// User solution
+// User's solution
 ${userCode}
 
-// Driver code
 int main() {
-    cout << "Input: " << ${input} << endl;
-    
-    // Create a solution instance
-    Solution solution;
-    
-    // Call the solution method
-    auto result = solution.solution();
-    
-    cout << "Your output: " << result << endl;
-    cout << "Expected output: " << ${JSON.stringify(testCase.output)} << endl;
-    
+    try {
+        cout << "=== Test Case Execution ===" << endl;
+        cout << "Input: " << ${JSON.stringify(JSON.stringify(input))} << endl;
+        
+        Solution sol;
+        
+        // For simplicity, assume the solution takes basic types
+        auto result = sol.solution();
+        
+        cout << "Your Output: " << result << endl;
+        cout << "Expected Output: " << ${JSON.stringify(JSON.stringify(expectedOutput))} << endl;
+        cout << "=== End Test Case ===" << endl;
+        
+        // Output the result for comparison
+        cout << "RESULT:" << result << endl;
+    } catch (const exception& error) {
+        cerr << "Error: " << error.what() << endl;
+        cout << "RESULT:ERROR" << endl;
+    }
     return 0;
 }
 `
-  },
-}
 
-// Function to wrap user code with driver code
-const wrapWithDriverCode = (code, language, testCase) => {
-  // Check if the code already has a main function or entry point
-  const hasMainFunction = {
-    javascript: code.includes("function runTest") || code.includes("console.log"),
-    python: code.includes("if __name__ == ") || code.includes("print("),
-    java: code.includes("public static void main"),
-    cpp: code.includes("int main("),
+    default:
+      throw new Error(`Unsupported language: ${language}`)
   }
-
-  // If the code already has a main function, return it as is
-  if (hasMainFunction[language]) {
-    return code
-  }
-
-  // Otherwise, wrap it with driver code
-  if (DRIVER_TEMPLATES[language]) {
-    return DRIVER_TEMPLATES[language](code, testCase)
-  }
-
-  // If no template is available, return the original code
-  return code
 }
 
 // Enhanced function to evaluate code using Judge0 API
@@ -185,14 +207,14 @@ const evaluateCode = async (code, language, testCases) => {
 
     console.log(`Evaluating ${language} code with ${testCases.length} test cases`)
 
-    // Process each test case with enhanced error handling
+    // Process each test case
     const results = await Promise.all(
       testCases.map(async (testCase, index) => {
         try {
-          // Wrap user code with driver code if needed
-          const wrappedCode = wrapWithDriverCode(code, language, testCase)
+          // Create complete executable code
+          const executableCode = createDriverCode(code, language, testCase)
 
-          const submission = await createSubmission(wrappedCode, languageId, testCase.input)
+          const submission = await createSubmission(executableCode, languageId, "")
 
           if (!submission.token) {
             throw new Error("Failed to create submission - no token received")
@@ -201,16 +223,15 @@ const evaluateCode = async (code, language, testCases) => {
           // Wait for the submission to be processed
           const result = await getSubmissionResult(submission.token)
 
-          // Enhanced output comparison
-          const normalizedExpected = normalizeOutput(testCase.output)
-          const normalizedActual = normalizeOutput(result.stdout || "")
-          const passed = normalizedExpected === normalizedActual
+          // Parse the output to extract result and console logs
+          const { actualOutput, consoleOutput, passed } = parseExecutionOutput(result.stdout || "", testCase.output)
 
           return {
             testCase: index + 1,
             input: testCase.input,
-            expectedOutput: normalizedExpected,
-            actualOutput: normalizedActual,
+            expectedOutput: testCase.output,
+            actualOutput,
+            consoleOutput,
             passed,
             status: STATUS_MAPPING[result.status?.id] || "Unknown",
             statusId: result.status?.id,
@@ -226,6 +247,7 @@ const evaluateCode = async (code, language, testCases) => {
             input: testCase.input,
             expectedOutput: testCase.output,
             actualOutput: "",
+            consoleOutput: "",
             passed: false,
             status: "Error",
             statusId: -1,
@@ -282,11 +304,11 @@ const runCode = async (code, language, testCase) => {
 
     console.log(`Running ${language} code`)
 
-    // Wrap user code with driver code if needed
-    const wrappedCode = wrapWithDriverCode(code, language, testCase)
+    // Create complete executable code
+    const executableCode = createDriverCode(code, language, testCase)
 
     // Create submission
-    const submission = await createSubmission(wrappedCode, languageId, testCase.input)
+    const submission = await createSubmission(executableCode, languageId, "")
 
     if (!submission.token) {
       throw new Error("Failed to create submission - no token received")
@@ -295,17 +317,16 @@ const runCode = async (code, language, testCase) => {
     // Wait for the submission to be processed
     const result = await getSubmissionResult(submission.token)
 
-    // Enhanced output comparison
-    const normalizedExpected = normalizeOutput(testCase.output)
-    const normalizedActual = normalizeOutput(result.stdout || "")
-    const passed = normalizedExpected === normalizedActual
+    // Parse the output to extract result and console logs
+    const { actualOutput, consoleOutput, passed } = parseExecutionOutput(result.stdout || "", testCase.output)
 
     return {
       success: true,
       result: {
         input: testCase.input,
-        expectedOutput: normalizedExpected,
-        actualOutput: normalizedActual,
+        expectedOutput: testCase.output,
+        actualOutput,
+        consoleOutput,
         passed,
         status: STATUS_MAPPING[result.status?.id] || "Unknown",
         statusId: result.status?.id,
@@ -313,7 +334,6 @@ const runCode = async (code, language, testCase) => {
         memoryUsed: result.memory ? Number.parseInt(result.memory) : null,
         error: result.stderr || result.compile_output || null,
         exitCode: result.exit_code,
-        stdout: result.stdout, // Include full stdout for debugging messages
       },
     }
   } catch (error) {
@@ -326,7 +346,57 @@ const runCode = async (code, language, testCase) => {
   }
 }
 
-// Helper function to create a submission with enhanced error handling
+// Helper function to parse execution output
+const parseExecutionOutput = (stdout, expectedOutput) => {
+  if (!stdout) {
+    return {
+      actualOutput: "",
+      consoleOutput: "",
+      passed: false,
+    }
+  }
+
+  // Split output into lines
+  const lines = stdout.split("\n")
+
+  // Find the result line
+  const resultLine = lines.find((line) => line.startsWith("RESULT:"))
+  let actualOutput = ""
+
+  if (resultLine) {
+    const resultValue = resultLine.substring(7) // Remove "RESULT:" prefix
+    if (resultValue === "ERROR") {
+      actualOutput = "Error occurred"
+    } else {
+      try {
+        // Try to parse JSON result
+        actualOutput = JSON.parse(resultValue)
+      } catch {
+        // If not JSON, use as string
+        actualOutput = resultValue
+      }
+    }
+  }
+
+  // Get console output (everything except the result line)
+  const consoleOutput = lines
+    .filter((line) => !line.startsWith("RESULT:"))
+    .join("\n")
+    .trim()
+
+  // Compare outputs
+  const normalizedExpected = normalizeOutput(expectedOutput)
+  const normalizedActual = normalizeOutput(actualOutput)
+  const passed = normalizedExpected === normalizedActual
+
+  return {
+    actualOutput: actualOutput.toString(),
+    consoleOutput,
+    passed,
+  }
+}
+
+// Helper function to create a submission
 const createSubmission = async (code, languageId, input) => {
   const options = {
     method: "POST",
@@ -334,7 +404,7 @@ const createSubmission = async (code, languageId, input) => {
     params: {
       base64_encoded: "false",
       wait: "false",
-      fields: "*", // Get all fields in response
+      fields: "*",
     },
     headers: {
       "content-type": "application/json",
@@ -345,19 +415,18 @@ const createSubmission = async (code, languageId, input) => {
       source_code: code,
       language_id: languageId,
       stdin: input,
-      expected_output: null,
-      cpu_time_limit: 2, // 2 seconds
-      cpu_extra_time: 0.5, // 0.5 seconds extra
-      wall_time_limit: 5, // 5 seconds wall time
-      memory_limit: 128000, // 128 MB
-      stack_limit: 64000, // 64 MB stack
+      cpu_time_limit: 3,
+      cpu_extra_time: 1,
+      wall_time_limit: 10,
+      memory_limit: 128000,
+      stack_limit: 64000,
       max_processes_and_or_threads: 60,
       enable_per_process_and_thread_time_limit: false,
       enable_per_process_and_thread_memory_limit: false,
-      max_file_size: 1024, // 1 MB
+      max_file_size: 1024,
       redirect_stderr_to_stdout: false,
     },
-    timeout: 10000, // 10 second timeout for the request
+    timeout: 10000,
   }
 
   try {
@@ -366,7 +435,7 @@ const createSubmission = async (code, languageId, input) => {
   } catch (error) {
     if (error.response) {
       console.error("Judge0 API Error:", error.response.status, error.response.data)
-      throw new Error(`Judge0 API Error: ${error.response.status} - ${JSON.stringify(error.response.data)}`)
+      throw new Error(`Judge0 API Error: ${error.response.status}`)
     } else if (error.request) {
       console.error("Network Error:", error.message)
       throw new Error("Network error: Unable to reach Judge0 API")
@@ -377,30 +446,30 @@ const createSubmission = async (code, languageId, input) => {
   }
 }
 
-// Helper function to get submission result with enhanced polling
+// Helper function to get submission result
 const getSubmissionResult = async (token) => {
   const options = {
     method: "GET",
     url: `${process.env.JUDGE0_API_URL}/submissions/${token}`,
     params: {
       base64_encoded: "false",
-      fields: "*", // Get all fields
+      fields: "*",
     },
     headers: {
       "X-RapidAPI-Key": process.env.JUDGE0_API_KEY,
       "X-RapidAPI-Host": process.env.JUDGE0_API_HOST || "judge0-ce.p.rapidapi.com",
     },
-    timeout: 5000, // 5 second timeout per request
+    timeout: 5000,
   }
 
   let result
   let status
   let attempts = 0
-  const maxAttempts = 30 // Maximum 30 seconds of polling
+  const maxAttempts = 20
 
   do {
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000)) // Wait 1 second between polls
+      await new Promise((resolve) => setTimeout(resolve, 1000))
       const response = await axios.request(options)
       result = response.data
       status = result.status?.id
@@ -408,7 +477,6 @@ const getSubmissionResult = async (token) => {
 
       console.log(`Polling attempt ${attempts}: Status ${status} (${STATUS_MAPPING[status] || "Unknown"})`)
 
-      // Break if we get a final status or exceed max attempts
       if (status >= 3 || attempts >= maxAttempts) {
         break
       }
@@ -420,7 +488,7 @@ const getSubmissionResult = async (token) => {
         throw new Error("Timeout: Code execution took too long")
       }
     }
-  } while (status === 1 || status === 2) // 1: In Queue, 2: Processing
+  } while (status === 1 || status === 2)
 
   if (attempts >= maxAttempts && (status === 1 || status === 2)) {
     throw new Error("Timeout: Code execution exceeded maximum wait time")
@@ -431,41 +499,32 @@ const getSubmissionResult = async (token) => {
 
 // Helper function to normalize output for comparison
 const normalizeOutput = (output) => {
-  if (!output) return ""
-  return output
-    .toString()
-    .trim()
-    .replace(/\r\n/g, "\n") // Normalize line endings
-    .replace(/\s+$/gm, "") // Remove trailing whitespace from each line
+  if (output === null || output === undefined) return ""
+  return output.toString().trim().replace(/\r\n/g, "\n").replace(/\s+$/gm, "")
 }
 
-// Enhanced fallback simulation functions
+// Simulation functions for when Judge0 is not available
 const simulateEvaluation = (code, testCases) => {
   console.log("Using simulation mode for code evaluation")
 
   const results = testCases.map((testCase, index) => {
-    // Simple heuristic for simulation
-    const hasLogic = code.includes("if") || code.includes("for") || code.includes("while")
-    const hasReturn = code.includes("return") || code.includes("print") || code.includes("console.log")
-    const isReasonableLength = code.length > 20
-
-    const passed = hasLogic && hasReturn && isReasonableLength
+    const hasFunction = code.includes("function") || code.includes("def") || code.includes("class")
+    const hasLogic = code.includes("return") || code.length > 50
+    const passed = hasFunction && hasLogic
 
     return {
       testCase: index + 1,
       input: testCase.input,
       expectedOutput: testCase.output,
       actualOutput: passed ? testCase.output : "undefined",
+      consoleOutput: `=== Test Case Execution ===\nInput: ${JSON.stringify(testCase.input)}\nYour Output: ${passed ? testCase.output : "undefined"}\nExpected Output: ${testCase.output}\n=== End Test Case ===`,
       passed,
       status: passed ? "Accepted" : "Wrong Answer",
       statusId: passed ? 3 : 4,
-      executionTime: Math.random() * 0.1, // Random execution time
-      memoryUsed: Math.floor(Math.random() * 1000) + 500, // Random memory usage
+      executionTime: Math.random() * 0.1,
+      memoryUsed: Math.floor(Math.random() * 1000) + 500,
       error: null,
       exitCode: 0,
-      stdout: passed
-        ? `Input: ${JSON.stringify(testCase.input)}\nYour output: ${testCase.output}\nExpected output: ${testCase.output}`
-        : "No output",
     }
   })
 
@@ -487,12 +546,9 @@ const simulateEvaluation = (code, testCases) => {
 const simulateExecution = (code, testCase) => {
   console.log("Using simulation mode for code execution")
 
-  // Simple heuristic for simulation
-  const hasLogic = code.includes("if") || code.includes("for") || code.includes("while")
-  const hasReturn = code.includes("return") || code.includes("print") || code.includes("console.log")
-  const isReasonableLength = code.length > 20
-
-  const passed = hasLogic && hasReturn && isReasonableLength
+  const hasFunction = code.includes("function") || code.includes("def") || code.includes("class")
+  const hasLogic = code.includes("return") || code.length > 50
+  const passed = hasFunction && hasLogic
 
   return {
     success: true,
@@ -500,6 +556,7 @@ const simulateExecution = (code, testCase) => {
       input: testCase.input,
       expectedOutput: testCase.output,
       actualOutput: passed ? testCase.output : "undefined",
+      consoleOutput: `=== Test Case Execution ===\nInput: ${JSON.stringify(testCase.input)}\nYour Output: ${passed ? testCase.output : "undefined"}\nExpected Output: ${testCase.output}\n=== End Test Case ===`,
       passed,
       status: passed ? "Accepted" : "Wrong Answer",
       statusId: passed ? 3 : 4,
@@ -507,47 +564,39 @@ const simulateExecution = (code, testCase) => {
       memoryUsed: Math.floor(Math.random() * 1000) + 500,
       error: null,
       exitCode: 0,
-      stdout: passed
-        ? `Input: ${JSON.stringify(testCase.input)}\nYour output: ${testCase.output}\nExpected output: ${testCase.output}`
-        : "No output",
     },
   }
 }
 
-// Function to get supported languages
-const getSupportedLanguages = () => {
-  return Object.keys(LANGUAGE_IDS).map((lang) => ({
-    id: LANGUAGE_IDS[lang],
-    name: lang,
-    displayName: lang.charAt(0).toUpperCase() + lang.slice(1),
-  }))
-}
-
-// Function to get language templates for function-only solutions
+// Function to get language templates
 const getLanguageTemplates = () => {
   return {
     javascript: `function solution(nums) {
   // Write your solution here
+  // Example: console.log("Debug message");
   
-  return result;
+  return 0; // Replace with your solution
 }`,
     python: `def solution(nums):
     # Write your solution here
+    # Example: print("Debug message")
     
-    return result`,
+    return 0 # Replace with your solution`,
     java: `class Solution {
-    public int solution(int[] nums) {
+    public int solution(Object input) {
         // Write your solution here
+        // Example: System.out.println("Debug message");
         
-        return result;
+        return 0; // Replace with your solution
     }
 }`,
     cpp: `class Solution {
 public:
-    int solution(vector<int>& nums) {
+    int solution() {
         // Write your solution here
+        // Example: cout << "Debug message" << endl;
         
-        return result;
+        return 0; // Replace with your solution
     }
 };`,
   }
@@ -556,7 +605,6 @@ public:
 module.exports = {
   evaluateCode,
   runCode,
-  getSupportedLanguages,
   getLanguageTemplates,
   LANGUAGE_IDS,
   STATUS_MAPPING,

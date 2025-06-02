@@ -1,5 +1,32 @@
 const mongoose = require("mongoose")
-const bcrypt = require("bcryptjs")
+
+const trophyHistorySchema = new mongoose.Schema({
+  action: {
+    type: String,
+    enum: ["earned", "lost"],
+    required: true,
+  },
+  amount: {
+    type: Number,
+    required: true,
+  },
+  reason: {
+    type: String,
+    required: true,
+  },
+  problemId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Problem",
+  },
+  matchId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Match",
+  },
+  date: {
+    type: Date,
+    default: Date.now,
+  },
+})
 
 const userSchema = new mongoose.Schema(
   {
@@ -30,10 +57,13 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
-    rating: {
+    // Trophy system instead of rating
+    trophies: {
       type: Number,
-      default: 1200,
+      default: 100, // Starting trophies
     },
+    trophyHistory: [trophyHistorySchema],
+    // Match statistics
     matchesPlayed: {
       type: Number,
       default: 0,
@@ -50,6 +80,7 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    // Practice statistics
     solvedProblems: [
       {
         problemId: {
@@ -64,6 +95,7 @@ const userSchema = new mongoose.Schema(
         code: String,
         executionTime: Number,
         memoryUsed: Number,
+        trophiesEarned: Number,
       },
     ],
     submissions: [
@@ -120,6 +152,8 @@ const userSchema = new mongoose.Schema(
       currentStreak: { type: Number, default: 0 },
       longestStreak: { type: Number, default: 0 },
       lastSolvedDate: Date,
+      totalTrophiesEarned: { type: Number, default: 0 },
+      totalTrophiesLost: { type: Number, default: 0 },
     },
   },
   {
@@ -144,40 +178,41 @@ userSchema.virtual("winRate").get(function () {
   return Math.round((this.matchesWon / this.matchesPlayed) * 100)
 })
 
+// Method to add trophy history
+userSchema.methods.addTrophyHistory = function (action, amount, reason, problemId = null, matchId = null) {
+  this.trophyHistory.push({
+    action,
+    amount,
+    reason,
+    problemId,
+    matchId,
+    date: new Date(),
+  })
+
+  if (action === "earned") {
+    this.trophies += amount
+    this.statistics.totalTrophiesEarned += amount
+  } else if (action === "lost") {
+    this.trophies = Math.max(0, this.trophies - amount)
+    this.statistics.totalTrophiesLost += amount
+  }
+}
+
+// Method to get trophy tier
+userSchema.virtual("trophyTier").get(function () {
+  const trophies = this.trophies
+  if (trophies >= 5000) return { name: "Legend", color: "#FF6B6B", icon: "👑" }
+  if (trophies >= 3000) return { name: "Champion", color: "#4ECDC4", icon: "🏆" }
+  if (trophies >= 2000) return { name: "Master", color: "#45B7D1", icon: "🥇" }
+  if (trophies >= 1000) return { name: "Expert", color: "#96CEB4", icon: "🥈" }
+  if (trophies >= 500) return { name: "Advanced", color: "#FFEAA7", icon: "🥉" }
+  if (trophies >= 200) return { name: "Intermediate", color: "#DDA0DD", icon: "🏅" }
+  return { name: "Beginner", color: "#A0A0A0", icon: "🔰" }
+})
+
 // Ensure virtual fields are serialized
 userSchema.set("toJSON", { virtuals: true })
 userSchema.set("toObject", { virtuals: true })
-
-
-// Hash password before saving
-userSchema.pre("save", async function (next) {
-  // Only hash the password if it has been modified (or is new) and exists
-  if (!this.isModified("password") || !this.password) {
-    return next()
-  }
-
-  try {
-    const salt = await bcrypt.genSalt(10)
-    this.password = await bcrypt.hash(this.password, salt)
-    next()
-  } catch (error) {
-    next(error)
-  }
-})
-
-// Compare password
-userSchema.methods.comparePassword = async function (candidatePassword) {
-  // If user has no password (Google Sign-In), return false
-  if (!this.password) {
-    return false
-  }
-
-  try {
-    return await bcrypt.compare(candidatePassword, this.password)
-  } catch (error) {
-    throw error
-  }
-}
 
 const User = mongoose.model("User", userSchema)
 
