@@ -1,5 +1,4 @@
 const mongoose = require("mongoose")
-const bcrypt = require("bcryptjs")
 
 const trophyHistorySchema = new mongoose.Schema({
   action: {
@@ -177,57 +176,11 @@ const userSchema = new mongoose.Schema(
       totalTrophiesEarned: { type: Number, default: 0 },
       totalTrophiesLost: { type: Number, default: 0 },
     },
-    // Security fields
-    lastLogin: {
-      date: Date,
-      ip: String,
-    },
-    accountLocked: {
-      type: Boolean,
-      default: false,
-    },
-    failedLoginAttempts: {
-      type: Number,
-      default: 0,
-    },
-    resetPasswordToken: String,
-    resetPasswordExpires: Date,
   },
   {
     timestamps: true,
   },
 )
-
-// Hash password before saving
-userSchema.pre("save", async function (next) {
-  
-
-  // Only hash the password if it has been modified or is new
-  if (!this.isModified("password") || !this.password) return next()
-
-  try {
-    // Generate salt
-    const salt = await bcrypt.genSalt(10)
-    // Hash password
-    this.password = await bcrypt.hash(this.password, salt)
-    next()
-  } catch (error) {
-    next(error)
-  }
-})
-
-// Compare password method
-userSchema.methods.comparePassword = async function (candidatePassword) {
-  try {
-    // Handle case where user has no password (Google auth)
-    if (!this.password) return false
-
-    return await bcrypt.compare(candidatePassword, this.password)
-  } catch (error) {
-    console.error("Password comparison error:", error)
-    return false
-  }
-}
 
 // Virtual field for total problems solved
 userSchema.virtual("totalProblemsSolved").get(function () {
