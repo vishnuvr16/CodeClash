@@ -60,7 +60,7 @@ app.use("/api/auth", authRoutes)
 app.use("/api/problems", problemRoutes)
 app.use("/api/user", userRoutes)
 app.use("/api/leaderboard", leaderboardRoutes)
-app.use("/api/matches", matchRoutes)
+app.use("/api/match", matchRoutes)
 app.use("/api/practice", practiceRoutes)
 
 // Set up Socket.IO with CORS and security

@@ -248,7 +248,7 @@ const Navbar = () => {
                 <div className="ml-3 flex-1">
                   <div className="text-base font-medium text-white">{currentUser?.username}</div>
                   <div className="text-sm text-gray-400">{currentUser?.email}</div>
-                  <div className="text-xs text-purple-400">Rating: {currentUser?.rating || 1200}</div>
+                  <div className="text-xs text-purple-400">Rating: {currentUser?.trophies || 100}</div>
                 </div>
               </div>
               <div className="space-y-1 px-2">
