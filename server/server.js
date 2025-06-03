@@ -20,7 +20,7 @@ const matchRoutes = require("./routes/matches")
 const practiceRoutes = require("./routes/practice")
 
 // Import socket handlers
-const { setupSocketHandlers } = require("./socket/socketHandlers")
+const { setupSocketHandlers } = require("./Socket/SocketHandlers")
 
 // Create Express app
 const app = express()
