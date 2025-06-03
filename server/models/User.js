@@ -1,4 +1,5 @@
 const mongoose = require("mongoose")
+const bcrypt = require("bcryptjs")
 
 const trophyHistorySchema = new mongoose.Schema({
   action: {
@@ -231,7 +232,7 @@ userSchema.virtual("trophyTier").get(function () {
   return { name: "Beginner", color: "#A0A0A0", icon: "🔰" }
 })
 
-UserSchema.pre("save", async function (next) {
+userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next()
 
   try {
@@ -244,7 +245,7 @@ UserSchema.pre("save", async function (next) {
 })
 
 // Method to compare passwords
-UserSchema.methods.comparePassword = async function (candidatePassword) {
+userSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password)
 }
 
