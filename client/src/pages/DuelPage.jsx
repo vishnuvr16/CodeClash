@@ -354,7 +354,7 @@ const DuelPage = () => {
     setOpponentStatus("running")
 
     try {
-      const response = await api.post(`/matches/${matchId}/run`, {
+      const response = await api.post(`/match/${matchId}/run`, {
         code,
         language,
         testCaseIndex: 0,
