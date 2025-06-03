@@ -8,7 +8,7 @@ const helmet = require("helmet")
 const mongoSanitize = require("express-mongo-sanitize")
 const xss = require("xss-clean")
 const rateLimit = require("express-rate-limit")
-const { sanitizeInputs } = require("./middleware/auth")
+
 require("dotenv").config()
 
 // Import routes
@@ -21,6 +21,7 @@ const practiceRoutes = require("./routes/practice")
 
 // Import socket handlers
 const { setupSocketHandlers } = require("./Socket/SocketHandlers")
+const { sanitizeInputs } = require("./middleware/auth")
 
 // Create Express app
 const app = express()
@@ -40,10 +41,10 @@ const corsOptions = {
 app.use(helmet()) // Set security headers
 app.use(cors(corsOptions))
 app.use(express.json({ limit: "10kb" })) // Limit JSON body size
+app.use(sanitizeInputs) // Sanitize inputs to prevent XSS attacks
 app.use(express.urlencoded({ extended: true, limit: "10kb" }))
 app.use(mongoSanitize()) // Prevent MongoDB operator injection
 app.use(xss()) // Sanitize user input
-app.use(sanitizeInputs()) // Custom sanitization middleware
 
 // Apply rate limiting to all requests
 const limiter = rateLimit({
@@ -82,24 +83,6 @@ const io = socketIo(server, {
 
 // Set up socket handlers
 setupSocketHandlers(io)
-
-// Serve static files in production
-if (process.env.NODE_ENV === "production") {
-  // Set security headers for static files
-  app.use(
-    express.static(path.join(__dirname, "../client/dist"), {
-      setHeaders: (res, path) => {
-        res.setHeader("X-Content-Type-Options", "nosniff")
-        res.setHeader("X-Frame-Options", "DENY")
-        res.setHeader("X-XSS-Protection", "1; mode=block")
-      },
-    }),
-  )
-
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "../client/dist/index.html"))
-  })
-}
 
 // Error handling middleware
 app.use((err, req, res, next) => {
