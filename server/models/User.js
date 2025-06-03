@@ -231,6 +231,24 @@ userSchema.virtual("trophyTier").get(function () {
   return { name: "Beginner", color: "#A0A0A0", icon: "🔰" }
 })
 
+UserSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) return next()
+
+  try {
+    const salt = await bcrypt.genSalt(10)
+    this.password = await bcrypt.hash(this.password, salt)
+    next()
+  } catch (error) {
+    next(error)
+  }
+})
+
+// Method to compare passwords
+UserSchema.methods.comparePassword = async function (candidatePassword) {
+  return await bcrypt.compare(candidatePassword, this.password)
+}
+
+
 // Ensure virtual fields are serialized
 userSchema.set("toJSON", { virtuals: true })
 userSchema.set("toObject", { virtuals: true })
