@@ -185,7 +185,7 @@ const userSchema = new mongoose.Schema(
 
 // Virtual field for total problems solved
 userSchema.virtual("totalProblemsSolved").get(function () {
-  return this.solvedProblems.length
+  return this.solvedProblems?.length
 })
 
 // Virtual field for acceptance rate
