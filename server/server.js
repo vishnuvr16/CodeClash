@@ -20,7 +20,7 @@ const matchRoutes = require("./routes/matches")
 const practiceRoutes = require("./routes/practice")
 
 // Import socket handlers
-const { setupSocketHandlers } = require("./Socket/SocketHandlers")
+const { setupSocketHandlers } = require("./socket/socketHandlers")
 
 // Create Express app
 const app = express()
@@ -43,7 +43,7 @@ app.use(express.json({ limit: "10kb" })) // Limit JSON body size
 app.use(express.urlencoded({ extended: true, limit: "10kb" }))
 app.use(mongoSanitize()) // Prevent MongoDB operator injection
 app.use(xss()) // Sanitize user input
-app.use(sanitizeInputs) // Custom sanitization middleware
+app.use(sanitizeInputs()) // Custom sanitization middleware
 
 // Apply rate limiting to all requests
 const limiter = rateLimit({
