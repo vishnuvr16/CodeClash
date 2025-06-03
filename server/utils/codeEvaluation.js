@@ -26,235 +26,12 @@ const STATUS_MAPPING = {
   14: "Exec Format Error",
 }
 
-// Create problem-specific driver code
-const createProblemDriverCode = (userCode, language, problem, testCase) => {
-  let functionSig = problem.functionSignatures?.find((sig) => sig.language === language)
-
-  // If no function signature found, create a default one
-  if (!functionSig) {
-    console.log(`No function signature found for ${language}, using default`)
-    functionSig = {
-      language: language,
-      functionName: "solution",
-      parameters: [{ name: "input", type: "any", description: "Input parameter" }],
-      returnType: "any",
-    }
-  }
-
-  const input = testCase.input
-  const expectedOutput = testCase.output
-
-  switch (language.toLowerCase()) {
-    case "javascript":
-      return createJavaScriptDriver(userCode, functionSig, input, expectedOutput)
-    case "python":
-      return createPythonDriver(userCode, functionSig, input, expectedOutput)
-    case "java":
-      return createJavaDriver(userCode, functionSig, input, expectedOutput)
-    case "cpp":
-      return createCppDriver(userCode, functionSig, input, expectedOutput)
-    default:
-      throw new Error(`Unsupported language: ${language}`)
-  }
-}
-
-const createJavaScriptDriver = (userCode, functionSig, input, expectedOutput) => {
-  const { functionName, parameters } = functionSig
-
-  // Parse input based on parameter types
-  const inputValues = Array.isArray(input) ? input : [input]
-  const parameterAssignments = parameters
-    .map((param, index) => {
-      const value = inputValues[index]
-      if (param.type.includes("[]") || param.type === "array") {
-        return `const ${param.name} = ${JSON.stringify(value)};`
-      } else if (param.type === "string") {
-        return `const ${param.name} = ${JSON.stringify(value)};`
-      } else {
-        return `const ${param.name} = ${JSON.stringify(value)};`
-      }
-    })
-    .join("\n  ")
-
-  const functionCall = `${functionName}(${parameters.map((p) => p.name).join(", ")})`
-
-  return `
-// User's solution
-${userCode}
-
-// Driver code
-try {
-  console.log("=== Test Case Execution ===");
-  console.log("Input:", ${JSON.stringify(input)});
-  
-  // Parse input parameters
-  ${parameterAssignments}
-  
-  // Call user's function
-  const result = ${functionCall};
-  
-  console.log("Your Output:", result);
-  console.log("Expected Output:", ${JSON.stringify(expectedOutput)});
-  console.log("=== End Test Case ===");
-  
-  // Output result for comparison
-  console.log("RESULT:" + JSON.stringify(result));
-} catch (error) {
-  console.error("Runtime Error:", error.message);
-  console.log("RESULT:ERROR");
-}
-`
-}
-
-const createPythonDriver = (userCode, functionSig, input, expectedOutput) => {
-  const { functionName, parameters } = functionSig
-
-  // Parse input based on parameter types
-  const inputValues = Array.isArray(input) ? input : [input]
-  const parameterAssignments = parameters
-    .map((param, index) => {
-      const value = inputValues[index]
-      return `${param.name} = ${JSON.stringify(value)}`
-    })
-    .join("\n    ")
-
-  const functionCall = `${functionName}(${parameters.map((p) => p.name).join(", ")})`
-
-  return `
-import json
-
-# User's solution
-${userCode}
-
-# Driver code
-try:
-    print("=== Test Case Execution ===")
-    print("Input:", ${JSON.stringify(input)})
-    
-    # Parse input parameters
-    ${parameterAssignments}
-    
-    # Call user's function
-    result = ${functionCall}
-    
-    print("Your Output:", result)
-    print("Expected Output:", ${JSON.stringify(expectedOutput)})
-    print("=== End Test Case ===")
-    
-    # Output result for comparison
-    print("RESULT:" + json.dumps(result))
-except Exception as error:
-    print("Runtime Error:", str(error))
-    print("RESULT:ERROR")
-`
-}
-
-const createJavaDriver = (userCode, functionSig, input, expectedOutput) => {
-  const { functionName, parameters, returnType } = functionSig
-
-  // Parse input based on parameter types
-  const inputValues = Array.isArray(input) ? input : [input]
-  const parameterAssignments = parameters
-    .map((param, index) => {
-      const value = inputValues[index]
-      if (param.type === "int[]") {
-        return `int[] ${param.name} = {${value.join(", ")}};`
-      } else if (param.type === "String[]") {
-        return `String[] ${param.name} = {${value.map((v) => `"${v}"`).join(", ")}};`
-      } else if (param.type === "String") {
-        return `String ${param.name} = "${value}";`
-      } else if (param.type === "int") {
-        return `int ${param.name} = ${value};`
-      } else {
-        return `Object ${param.name} = ${JSON.stringify(value)};`
-      }
-    })
-    .join("\n        ")
-
-  const functionCall = `solution.${functionName}(${parameters.map((p) => p.name).join(", ")})`
-
-  return `
-import java.util.*;
-import java.util.stream.*;
-
-public class Main {
-    public static void main(String[] args) {
-        try {
-            System.out.println("=== Test Case Execution ===");
-            System.out.println("Input: " + ${JSON.stringify(JSON.stringify(input))});
-            
-            Solution solution = new Solution();
-            
-            // Parse input parameters
-            ${parameterAssignments}
-            
-            // Call user's function
-            ${returnType} result = ${functionCall};
-            
-            System.out.println("Your Output: " + result);
-            System.out.println("Expected Output: " + ${JSON.stringify(JSON.stringify(expectedOutput))});
-            System.out.println("=== End Test Case ===");
-            
-            // Output result for comparison
-            if (result instanceof int[]) {
-                System.out.println("RESULT:" + Arrays.toString((int[])result));
-            } else if (result instanceof String[]) {
-                System.out.println("RESULT:" + Arrays.toString((String[])result));
-            } else {
-                System.out.println("RESULT:" + result);
-            }
-        } catch (Exception error) {
-            System.err.println("Runtime Error: " + error.getMessage());
-            System.out.println("RESULT:ERROR");
-        }
-    }
-}
-
-// User's solution
-${userCode}
-`
-}
-
-const createCppDriver = (userCode, functionSig, input, expectedOutput) => {
-  const { functionName, parameters } = functionSig
-
-  return `
-#include <iostream>
-#include <vector>
-#include <string>
-#include <algorithm>
-using namespace std;
-
-// User's solution
-${userCode}
-
-int main() {
-    try {
-        cout << "=== Test Case Execution ===" << endl;
-        cout << "Input: " << ${JSON.stringify(JSON.stringify(input))} << endl;
-        
-        Solution solution;
-        
-        // For C++, we'll use a simplified approach
-        auto result = solution.${functionName}();
-        
-        cout << "Your Output: " << result << endl;
-        cout << "Expected Output: " << ${JSON.stringify(JSON.stringify(expectedOutput))} << endl;
-        cout << "=== End Test Case ===" << endl;
-        
-        cout << "RESULT:" << result << endl;
-    } catch (const exception& error) {
-        cerr << "Runtime Error: " << error.what() << endl;
-        cout << "RESULT:ERROR" << endl;
-    }
-    return 0;
-}
-`
-}
-
-// Enhanced function to evaluate code using Judge0 API
-const evaluateCode = async (code, language, problem, testCases) => {
+// Simple code evaluation - user writes everything
+const evaluateCode = async (code, language, testCases) => {
   try {
+    console.log(`Evaluating ${language} code with ${testCases.length} test cases`)
+
+    // If Judge0 is not available, use simulation
     if (!process.env.JUDGE0_API_KEY) {
       console.log("No Judge0 API key found, using simulation")
       return simulateEvaluation(code, testCases)
@@ -265,16 +42,14 @@ const evaluateCode = async (code, language, problem, testCases) => {
       throw new Error(`Unsupported language: ${language}`)
     }
 
-    console.log(`Evaluating ${language} code with ${testCases.length} test cases`)
-
     // Process each test case
     const results = await Promise.all(
       testCases.map(async (testCase, index) => {
         try {
-          // Create problem-specific executable code
-          const executableCode = createProblemDriverCode(code, language, problem, testCase)
+          const startTime = Date.now()
 
-          const submission = await createSubmission(executableCode, languageId, "")
+          // Create submission with user's code and test case input
+          const submission = await createSubmission(code, languageId, testCase.input)
 
           if (!submission.token) {
             throw new Error("Failed to create submission - no token received")
@@ -282,20 +57,24 @@ const evaluateCode = async (code, language, problem, testCases) => {
 
           // Wait for the submission to be processed
           const result = await getSubmissionResult(submission.token)
+          const executionTime = Date.now() - startTime
 
-          // Parse the output to extract result and console logs
-          const { actualOutput, consoleOutput, passed } = parseExecutionOutput(result.stdout || "", testCase.output)
+          // Parse the output
+          const actualOutput = (result.stdout || "").trim()
+          const expectedOutput = testCase.output.toString().trim()
+          const passed = actualOutput === expectedOutput
 
           return {
             testCase: index + 1,
             input: testCase.input,
             expectedOutput: testCase.output,
-            actualOutput,
-            consoleOutput,
+            actualOutput: actualOutput || "No output",
+            stdout: result.stdout || "",
+            stderr: result.stderr || "",
             passed,
             status: STATUS_MAPPING[result.status?.id] || "Unknown",
             statusId: result.status?.id,
-            executionTime: result.time ? Number.parseFloat(result.time) : null,
+            executionTime: result.time ? Number.parseFloat(result.time) * 1000 : executionTime, // Convert to ms
             memoryUsed: result.memory ? Number.parseInt(result.memory) : null,
             error: result.stderr || result.compile_output || null,
             exitCode: result.exit_code,
@@ -307,7 +86,8 @@ const evaluateCode = async (code, language, problem, testCases) => {
             input: testCase.input,
             expectedOutput: testCase.output,
             actualOutput: "",
-            consoleOutput: "",
+            stdout: "",
+            stderr: error.message,
             passed: false,
             status: "Error",
             statusId: -1,
@@ -325,6 +105,7 @@ const evaluateCode = async (code, language, problem, testCases) => {
     const allPassed = passedCount === testCases.length
     const totalExecutionTime = results.reduce((sum, result) => sum + (result.executionTime || 0), 0)
     const maxMemoryUsed = Math.max(...results.map((result) => result.memoryUsed || 0))
+    const avgExecutionTime = totalExecutionTime / results.length
 
     return {
       success: true,
@@ -333,8 +114,14 @@ const evaluateCode = async (code, language, problem, testCases) => {
       passedCount,
       totalTestCases: testCases.length,
       totalExecutionTime: Number.parseFloat(totalExecutionTime.toFixed(3)),
+      avgExecutionTime: Number.parseFloat(avgExecutionTime.toFixed(3)),
       maxMemoryUsed,
       overallStatus: allPassed ? "Accepted" : "Failed",
+      performance: {
+        timeComplexity: calculateTimeComplexity(avgExecutionTime),
+        spaceComplexity: calculateSpaceComplexity(maxMemoryUsed),
+        efficiency: calculateEfficiency(passedCount, testCases.length, avgExecutionTime),
+      },
     }
   } catch (error) {
     console.error("Code evaluation error:", error)
@@ -349,9 +136,12 @@ const evaluateCode = async (code, language, problem, testCases) => {
   }
 }
 
-// Enhanced function to run code against a single test case
-const runCode = async (code, language, problem, testCase) => {
+// Simple code execution for single test case
+const runCode = async (code, language, testCase) => {
   try {
+    console.log(`Running ${language} code`)
+
+    // If Judge0 is not available, use simulation
     if (!process.env.JUDGE0_API_KEY) {
       console.log("No Judge0 API key found, using simulation")
       return simulateExecution(code, testCase)
@@ -362,13 +152,10 @@ const runCode = async (code, language, problem, testCase) => {
       throw new Error(`Unsupported language: ${language}`)
     }
 
-    console.log(`Running ${language} code`)
+    const startTime = Date.now()
 
-    // Create problem-specific executable code
-    const executableCode = createProblemDriverCode(code, language, problem, testCase)
-
-    // Create submission
-    const submission = await createSubmission(executableCode, languageId, "")
+    // Create submission with user's code and test case input
+    const submission = await createSubmission(code, languageId, testCase.input)
 
     if (!submission.token) {
       throw new Error("Failed to create submission - no token received")
@@ -376,21 +163,25 @@ const runCode = async (code, language, problem, testCase) => {
 
     // Wait for the submission to be processed
     const result = await getSubmissionResult(submission.token)
+    const executionTime = Date.now() - startTime
 
-    // Parse the output to extract result and console logs
-    const { actualOutput, consoleOutput, passed } = parseExecutionOutput(result.stdout || "", testCase.output)
+    // Parse the output
+    const actualOutput = (result.stdout || "").trim()
+    const expectedOutput = testCase.output.toString().trim()
+    const passed = actualOutput === expectedOutput
 
     return {
       success: true,
       result: {
         input: testCase.input,
         expectedOutput: testCase.output,
-        actualOutput,
-        consoleOutput,
+        actualOutput: actualOutput || "No output",
+        stdout: result.stdout || "",
+        stderr: result.stderr || "",
         passed,
         status: STATUS_MAPPING[result.status?.id] || "Unknown",
         statusId: result.status?.id,
-        executionTime: result.time ? Number.parseFloat(result.time) : null,
+        executionTime: result.time ? Number.parseFloat(result.time) * 1000 : executionTime, // Convert to ms
         memoryUsed: result.memory ? Number.parseInt(result.memory) : null,
         error: result.stderr || result.compile_output || null,
         exitCode: result.exit_code,
@@ -406,61 +197,11 @@ const runCode = async (code, language, problem, testCase) => {
   }
 }
 
-// Helper function to parse execution output
-const parseExecutionOutput = (stdout, expectedOutput) => {
-  if (!stdout) {
-    return {
-      actualOutput: "",
-      consoleOutput: "",
-      passed: false,
-    }
-  }
-
-  // Split output into lines
-  const lines = stdout.split("\n")
-
-  // Find the result line
-  const resultLine = lines.find((line) => line.startsWith("RESULT:"))
-  let actualOutput = ""
-
-  if (resultLine) {
-    const resultValue = resultLine.substring(7) // Remove "RESULT:" prefix
-    if (resultValue === "ERROR") {
-      actualOutput = "Error occurred"
-    } else {
-      try {
-        // Try to parse JSON result
-        actualOutput = JSON.parse(resultValue)
-      } catch {
-        // If not JSON, use as string
-        actualOutput = resultValue
-      }
-    }
-  }
-
-  // Get console output (everything except the result line)
-  const consoleOutput = lines
-    .filter((line) => !line.startsWith("RESULT:"))
-    .join("\n")
-    .trim()
-
-  // Compare outputs
-  const normalizedExpected = normalizeOutput(expectedOutput)
-  const normalizedActual = normalizeOutput(actualOutput)
-  const passed = normalizedExpected === normalizedActual
-
-  return {
-    actualOutput: actualOutput.toString(),
-    consoleOutput,
-    passed,
-  }
-}
-
 // Helper function to create a submission
 const createSubmission = async (code, languageId, input) => {
   const options = {
     method: "POST",
-    url: `${process.env.JUDGE0_API_URL}/submissions`,
+    url: `${process.env.JUDGE0_API_URL || "https://judge0-ce.p.rapidapi.com"}/submissions`,
     params: {
       base64_encoded: "false",
       wait: "false",
@@ -474,8 +215,8 @@ const createSubmission = async (code, languageId, input) => {
     data: {
       source_code: code,
       language_id: languageId,
-      stdin: input,
-      cpu_time_limit: 3,
+      stdin: input.toString(),
+      cpu_time_limit: 5,
       cpu_extra_time: 1,
       wall_time_limit: 10,
       memory_limit: 128000,
@@ -510,7 +251,7 @@ const createSubmission = async (code, languageId, input) => {
 const getSubmissionResult = async (token) => {
   const options = {
     method: "GET",
-    url: `${process.env.JUDGE0_API_URL}/submissions/${token}`,
+    url: `${process.env.JUDGE0_API_URL || "https://judge0-ce.p.rapidapi.com"}/submissions/${token}`,
     params: {
       base64_encoded: "false",
       fields: "*",
@@ -525,7 +266,7 @@ const getSubmissionResult = async (token) => {
   let result
   let status
   let attempts = 0
-  const maxAttempts = 20
+  const maxAttempts = 30
 
   do {
     try {
@@ -557,10 +298,30 @@ const getSubmissionResult = async (token) => {
   return result
 }
 
-// Helper function to normalize output for comparison
-const normalizeOutput = (output) => {
-  if (output === null || output === undefined) return ""
-  return output.toString().trim().replace(/\r\n/g, "\n").replace(/\s+$/gm, "")
+// Performance calculation functions
+const calculateTimeComplexity = (avgTime) => {
+  if (avgTime < 10) return "O(1) - Excellent"
+  if (avgTime < 50) return "O(log n) - Very Good"
+  if (avgTime < 200) return "O(n) - Good"
+  if (avgTime < 1000) return "O(n log n) - Fair"
+  if (avgTime < 5000) return "O(n²) - Poor"
+  return "O(n³+) - Very Poor"
+}
+
+const calculateSpaceComplexity = (maxMemory) => {
+  if (!maxMemory) return "Unknown"
+  if (maxMemory < 1000) return "O(1) - Excellent"
+  if (maxMemory < 5000) return "O(log n) - Very Good"
+  if (maxMemory < 20000) return "O(n) - Good"
+  if (maxMemory < 50000) return "O(n log n) - Fair"
+  if (maxMemory < 100000) return "O(n²) - Poor"
+  return "O(n³+) - Very Poor"
+}
+
+const calculateEfficiency = (passed, total, avgTime) => {
+  const accuracy = (passed / total) * 100
+  const speed = avgTime < 100 ? 100 : Math.max(0, 100 - avgTime / 10)
+  return Math.round((accuracy + speed) / 2)
 }
 
 // Simulation functions for when Judge0 is not available
@@ -568,28 +329,35 @@ const simulateEvaluation = (code, testCases) => {
   console.log("Using simulation mode for code evaluation")
 
   const results = testCases.map((testCase, index) => {
-    const hasFunction = code.includes("function") || code.includes("def") || code.includes("class")
-    const hasLogic = code.includes("return") || code.length > 50
-    const passed = hasFunction && hasLogic
+    const hasLogic =
+      code.length > 20 && (code.includes("print") || code.includes("console.log") || code.includes("System.out"))
+    const passed = hasLogic && Math.random() > 0.3 // 70% pass rate for simulation
+
+    const executionTime = Math.random() * 100 + 10
+    const memoryUsed = Math.floor(Math.random() * 5000) + 1000
 
     return {
       testCase: index + 1,
       input: testCase.input,
       expectedOutput: testCase.output,
-      actualOutput: passed ? testCase.output : "undefined",
-      consoleOutput: `=== Test Case Execution ===\nInput: ${JSON.stringify(testCase.input)}\nYour Output: ${passed ? testCase.output : "undefined"}\nExpected Output: ${testCase.output}\n=== End Test Case ===`,
+      actualOutput: passed ? testCase.output : "Wrong output",
+      stdout: passed ? testCase.output : "Wrong output",
+      stderr: passed ? "" : "Logic error",
       passed,
       status: passed ? "Accepted" : "Wrong Answer",
       statusId: passed ? 3 : 4,
-      executionTime: Math.random() * 0.1,
-      memoryUsed: Math.floor(Math.random() * 1000) + 500,
-      error: null,
-      exitCode: 0,
+      executionTime,
+      memoryUsed,
+      error: passed ? null : "Logic error",
+      exitCode: passed ? 0 : 1,
     }
   })
 
   const passedCount = results.filter((result) => result.passed).length
   const allPassed = passedCount === testCases.length
+  const totalExecutionTime = results.reduce((sum, r) => sum + r.executionTime, 0)
+  const avgExecutionTime = totalExecutionTime / results.length
+  const maxMemoryUsed = Math.max(...results.map((r) => r.memoryUsed))
 
   return {
     success: true,
@@ -597,33 +365,43 @@ const simulateEvaluation = (code, testCases) => {
     allPassed,
     passedCount,
     totalTestCases: testCases.length,
-    totalExecutionTime: results.reduce((sum, r) => sum + r.executionTime, 0),
-    maxMemoryUsed: Math.max(...results.map((r) => r.memoryUsed)),
+    totalExecutionTime: Number.parseFloat(totalExecutionTime.toFixed(3)),
+    avgExecutionTime: Number.parseFloat(avgExecutionTime.toFixed(3)),
+    maxMemoryUsed,
     overallStatus: allPassed ? "Accepted" : "Failed",
+    performance: {
+      timeComplexity: calculateTimeComplexity(avgExecutionTime),
+      spaceComplexity: calculateSpaceComplexity(maxMemoryUsed),
+      efficiency: calculateEfficiency(passedCount, testCases.length, avgExecutionTime),
+    },
   }
 }
 
 const simulateExecution = (code, testCase) => {
   console.log("Using simulation mode for code execution")
 
-  const hasFunction = code.includes("function") || code.includes("def") || code.includes("class")
-  const hasLogic = code.includes("return") || code.length > 50
-  const passed = hasFunction && hasLogic
+  const hasLogic =
+    code.length > 20 && (code.includes("print") || code.includes("console.log") || code.includes("System.out"))
+  const passed = hasLogic && Math.random() > 0.3 // 70% pass rate for simulation
+
+  const executionTime = Math.random() * 100 + 10
+  const memoryUsed = Math.floor(Math.random() * 5000) + 1000
 
   return {
     success: true,
     result: {
       input: testCase.input,
       expectedOutput: testCase.output,
-      actualOutput: passed ? testCase.output : "undefined",
-      consoleOutput: `=== Test Case Execution ===\nInput: ${JSON.stringify(testCase.input)}\nYour Output: ${passed ? testCase.output : "undefined"}\nExpected Output: ${testCase.output}\n=== End Test Case ===`,
+      actualOutput: passed ? testCase.output : "Wrong output",
+      stdout: passed ? testCase.output : "Wrong output",
+      stderr: passed ? "" : "Logic error",
       passed,
       status: passed ? "Accepted" : "Wrong Answer",
       statusId: passed ? 3 : 4,
-      executionTime: Math.random() * 0.1,
-      memoryUsed: Math.floor(Math.random() * 1000) + 500,
-      error: null,
-      exitCode: 0,
+      executionTime,
+      memoryUsed,
+      error: passed ? null : "Logic error",
+      exitCode: passed ? 0 : 1,
     },
   }
 }

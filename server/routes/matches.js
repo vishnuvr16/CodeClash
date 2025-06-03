@@ -1,10 +1,11 @@
 const express = require("express")
-const router = express.Router()
 const Match = require("../models/Match")
-const User = require("../models/User")
 const Problem = require("../models/Problem")
+const User = require("../models/User")
+const {authenticateToken} = require("../middleware/auth")
 const { evaluateCode, runCode } = require("../utils/codeEvaluation")
-const { authenticateToken } = require("../middleware/auth")
+
+const router = express.Router()
 
 // Trophy rewards/penalties for duels
 const DUEL_TROPHY_REWARDS = {
@@ -14,12 +15,11 @@ const DUEL_TROPHY_REWARDS = {
 }
 
 // Get match details
-router.get("/:matchId", authenticateToken, async (req, res) => {
+router.get("/:id", authenticateToken, async (req, res) => {
   try {
-    const { matchId } = req.params
-    const userId = req.user.id
+    const { id } = req.params
 
-    const match = await Match.findById(matchId)
+    const match = await Match.findById(id)
       .populate("userA", "username trophies")
       .populate("userB", "username trophies")
       .populate("problem")
@@ -32,7 +32,7 @@ router.get("/:matchId", authenticateToken, async (req, res) => {
     }
 
     // Check if user is part of the match
-    if (match.userA._id.toString() !== userId && match.userB._id.toString() !== userId) {
+    if (match.userA._id.toString() !== req.user.id && match.userB._id.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: "Not authorized to view this match",
@@ -53,12 +53,11 @@ router.get("/:matchId", authenticateToken, async (req, res) => {
   }
 })
 
-// Run code against a test case in a match
-router.post("/:matchId/run", authenticateToken, async (req, res) => {
+// Run code against a single test case in a match
+router.post("/:id/run", authenticateToken, async (req, res) => {
   try {
-    const { matchId } = req.params
+    const { id } = req.params
     const { code, language, testCaseIndex = 0 } = req.body
-    const userId = req.user.id
 
     if (!code || !language) {
       return res.status(400).json({
@@ -68,7 +67,7 @@ router.post("/:matchId/run", authenticateToken, async (req, res) => {
     }
 
     // Find the match
-    const match = await Match.findById(matchId).populate("problem")
+    const match = await Match.findById(id).populate("problem")
     if (!match) {
       return res.status(404).json({
         success: false,
@@ -77,24 +76,15 @@ router.post("/:matchId/run", authenticateToken, async (req, res) => {
     }
 
     // Check if user is part of the match
-    if (match.userA.toString() !== userId && match.userB.toString() !== userId) {
+    if (match.userA.toString() !== req.user.id && match.userB.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: "Not authorized to run code in this match",
       })
     }
 
-    // Check if match is active
-    if (match.status !== "active") {
-      return res.status(400).json({
-        success: false,
-        message: "Match is not active",
-      })
-    }
-
-    // Get the test case (use first public test case)
-    const publicTestCases = match.problem.testCases.filter((tc) => !tc.isHidden)
-    const testCase = publicTestCases[0]
+    // Use only the first test case for running (example)
+    const testCase = match.problem.testCases[0]
 
     if (!testCase) {
       return res.status(400).json({
@@ -103,8 +93,8 @@ router.post("/:matchId/run", authenticateToken, async (req, res) => {
       })
     }
 
-    // Run the code with problem-specific driver
-    const result = await runCode(code, language, match.problem, testCase)
+    // Run the code directly
+    const result = await runCode(code, language, testCase)
 
     if (!result.success) {
       return res.status(400).json({
@@ -128,11 +118,10 @@ router.post("/:matchId/run", authenticateToken, async (req, res) => {
 })
 
 // Submit solution in a match
-router.post("/:matchId/submit", authenticateToken, async (req, res) => {
+router.post("/:id/submit", authenticateToken, async (req, res) => {
   try {
-    const { matchId } = req.params
+    const { id } = req.params
     const { code, language } = req.body
-    const userId = req.user.id
 
     if (!code || !language) {
       return res.status(400).json({
@@ -142,7 +131,7 @@ router.post("/:matchId/submit", authenticateToken, async (req, res) => {
     }
 
     // Find the match
-    const match = await Match.findById(matchId).populate("problem")
+    const match = await Match.findById(id).populate("problem")
     if (!match) {
       return res.status(404).json({
         success: false,
@@ -151,7 +140,7 @@ router.post("/:matchId/submit", authenticateToken, async (req, res) => {
     }
 
     // Check if user is part of the match
-    if (match.userA.toString() !== userId && match.userB.toString() !== userId) {
+    if (match.userA.toString() !== req.user.id && match.userB.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: "Not authorized to submit in this match",
@@ -166,8 +155,8 @@ router.post("/:matchId/submit", authenticateToken, async (req, res) => {
       })
     }
 
-    // Evaluate code against all test cases with problem-specific driver
-    const evaluation = await evaluateCode(code, language, match.problem, match.problem.testCases)
+    // Evaluate code against all test cases
+    const evaluation = await evaluateCode(code, language, match.problem.testCases)
 
     if (!evaluation.success) {
       return res.status(400).json({
@@ -177,58 +166,72 @@ router.post("/:matchId/submit", authenticateToken, async (req, res) => {
     }
 
     const isCorrect = evaluation.allPassed
+    const userId = req.user.id
+    const isUserA = match.userA.toString() === userId
 
+    // Update match with submission
+    const submissionData = {
+      code,
+      language,
+      submittedAt: new Date(),
+      isCorrect,
+      testResults: evaluation.results,
+      performance: evaluation.performance,
+      executionTime: evaluation.avgExecutionTime,
+      memoryUsed: evaluation.maxMemoryUsed,
+    }
+
+    if (isUserA) {
+      match.userASubmission = submissionData
+    } else {
+      match.userBSubmission = submissionData
+    }
+
+    // If this is a correct solution, end the match
     if (isCorrect) {
-      // User solved the problem - they win the match
-      const winnerId = userId
-      const loserId = match.userA.toString() === userId ? match.userB.toString() : match.userA.toString()
-
-      // Update match
       match.status = "completed"
-      match.winner = winnerId
+      match.winner = userId
       match.endTime = new Date()
-      await match.save()
 
-      // Update user statistics and trophies
-      const winner = await User.findById(winnerId)
-      const loser = await User.findById(loserId)
+      // Update trophies for both users
+      const winner = await User.findById(userId)
+      const opponentId = isUserA ? match.userB : match.userA
+      const loser = await User.findById(opponentId)
 
       if (winner && loser) {
         // Winner gains trophies
-        winner.addTrophyHistory("earned", DUEL_TROPHY_REWARDS.win, `Won duel against ${loser.username}`, null, matchId)
+        winner.addTrophyHistory("earned", DUEL_TROPHY_REWARDS.win, `Won duel against ${loser.username}`, null, id)
         winner.matchesWon += 1
         winner.matchesPlayed += 1
 
         // Loser loses trophies
-        loser.addTrophyHistory(
-          "lost",
-          Math.abs(DUEL_TROPHY_REWARDS.loss),
-          `Lost duel to ${winner.username}`,
-          null,
-          matchId,
-        )
+        loser.addTrophyHistory("lost", Math.abs(DUEL_TROPHY_REWARDS.loss), `Lost duel to ${winner.username}`, null, id)
         loser.matchesLost += 1
         loser.matchesPlayed += 1
 
         await Promise.all([winner.save(), loser.save()])
       }
 
-      res.json({
+      await match.save()
+
+      return res.json({
         success: true,
         isCorrect: true,
         match: match.toObject(),
-        trophiesEarned: DUEL_TROPHY_REWARDS.win,
-        message: `Congratulations! You solved the problem and won the duel! You earned ${DUEL_TROPHY_REWARDS.win} trophies!`,
-      })
-    } else {
-      // Solution is incorrect
-      res.json({
-        success: true,
-        isCorrect: false,
-        results: evaluation.results,
-        message: "Solution incorrect. Keep trying!",
+        evaluation,
+        message: "Congratulations! You won the duel!",
+        trophyChange: DUEL_TROPHY_REWARDS.win,
       })
     }
+
+    await match.save()
+
+    res.json({
+      success: true,
+      isCorrect: false,
+      evaluation,
+      message: "Solution incorrect. Keep trying!",
+    })
   } catch (error) {
     console.error("Error submitting solution:", error)
     res.status(500).json({
@@ -239,14 +242,13 @@ router.post("/:matchId/submit", authenticateToken, async (req, res) => {
   }
 })
 
-// Concede a match
-router.post("/:matchId/concede", authenticateToken, async (req, res) => {
+// Concede match
+router.post("/:id/concede", authenticateToken, async (req, res) => {
   try {
-    const { matchId } = req.params
-    const userId = req.user.id
+    const { id } = req.params
 
     // Find the match
-    const match = await Match.findById(matchId)
+    const match = await Match.findById(id)
     if (!match) {
       return res.status(404).json({
         success: false,
@@ -255,7 +257,7 @@ router.post("/:matchId/concede", authenticateToken, async (req, res) => {
     }
 
     // Check if user is part of the match
-    if (match.userA.toString() !== userId && match.userB.toString() !== userId) {
+    if (match.userA.toString() !== req.user.id && match.userB.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: "Not authorized to concede this match",
@@ -270,30 +272,28 @@ router.post("/:matchId/concede", authenticateToken, async (req, res) => {
       })
     }
 
-    // Set opponent as winner
+    const userId = req.user.id
     const isUserA = match.userA.toString() === userId
-    const winnerId = isUserA ? match.userB.toString() : match.userA.toString()
-    const loserId = userId
+    const winnerId = isUserA ? match.userB : match.userA
 
     // Update match
     match.status = "completed"
     match.winner = winnerId
     match.endTime = new Date()
     match.concedeBy = userId
-    await match.save()
 
-    // Update user statistics and trophies
+    // Update trophies for both users
     const winner = await User.findById(winnerId)
-    const loser = await User.findById(loserId)
+    const loser = await User.findById(userId)
 
     if (winner && loser) {
       // Winner gains trophies
       winner.addTrophyHistory(
         "earned",
         DUEL_TROPHY_REWARDS.win,
-        `Won duel (opponent conceded): ${loser.username}`,
+        `Won duel against ${loser.username} (opponent conceded)`,
         null,
-        matchId,
+        id,
       )
       winner.matchesWon += 1
       winner.matchesPlayed += 1
@@ -302,9 +302,9 @@ router.post("/:matchId/concede", authenticateToken, async (req, res) => {
       loser.addTrophyHistory(
         "lost",
         Math.abs(DUEL_TROPHY_REWARDS.loss),
-        `Conceded duel to ${winner.username}`,
+        `Lost duel to ${winner.username} (conceded)`,
         null,
-        matchId,
+        id,
       )
       loser.matchesLost += 1
       loser.matchesPlayed += 1
@@ -312,68 +312,19 @@ router.post("/:matchId/concede", authenticateToken, async (req, res) => {
       await Promise.all([winner.save(), loser.save()])
     }
 
+    await match.save()
+
     res.json({
       success: true,
       message: "Match conceded successfully",
       match: match.toObject(),
-      trophiesLost: Math.abs(DUEL_TROPHY_REWARDS.loss),
+      trophyChange: DUEL_TROPHY_REWARDS.loss,
     })
   } catch (error) {
     console.error("Error conceding match:", error)
     res.status(500).json({
       success: false,
       message: "Error conceding match",
-      error: error.message,
-    })
-  }
-})
-
-router.get("/user/:userId/recent", async (req, res) => {
-  try {
-    const { userId } = req.params
-    const { limit = 10 } = req.query
-
-    const matches = await Match.find({
-      $or: [{ userA: userId }, { userB: userId }],
-      status: "completed",
-    })
-      .populate("userA userB problem winner", "username rating title")
-      .sort({ endTime: -1 })
-      .limit(Number.parseInt(limit))
-      .lean()
-
-    // Format matches for response
-    const formattedMatches = matches.map((match) => {
-      const isUserA = match.userA._id.toString() === userId
-      const opponent = isUserA ? match.userB : match.userA
-      const userWon = match.winner && match.winner._id.toString() === userId
-
-      return {
-        id: match._id,
-        opponent: {
-          username: opponent.username,
-          rating: opponent.rating,
-        },
-        problem: {
-          title: match.problem.title,
-        },
-        result: userWon ? "win" : "loss",
-        date: match.endTime,
-        ratingChange: userWon ? 25 : -25, // Simplified rating change
-        endReason: match.endReason || "solution",
-        concedeBy: match.concedeBy,
-      }
-    })
-
-    res.json({
-      success: true,
-      matches: formattedMatches,
-    })
-  } catch (error) {
-    console.error("Error fetching recent matches:", error)
-    res.status(500).json({
-      success: false,
-      message: "Error fetching recent matches",
       error: error.message,
     })
   }

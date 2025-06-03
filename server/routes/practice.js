@@ -1,8 +1,9 @@
 const express = require("express")
 const Problem = require("../models/Problem")
 const User = require("../models/User")
+const {authenticateToken} = require("../middleware/auth")
 const { evaluateCode, runCode } = require("../utils/codeEvaluation")
-const { authenticateToken } = require("../middleware/auth")
+
 const router = express.Router()
 
 // Trophy rewards for different difficulties
@@ -84,6 +85,24 @@ router.get("/problems", async (req, res) => {
   }
 })
 
+// Get available tags
+router.get("/tags", async (req, res) => {
+  try {
+    const tags = await Problem.distinct("tags")
+    res.json({
+      success: true,
+      tags: tags.filter((tag) => tag && tag.trim() !== ""),
+    })
+  } catch (error) {
+    console.error("Error fetching tags:", error)
+    res.status(500).json({
+      success: false,
+      message: "Error fetching tags",
+      error: error.message,
+    })
+  }
+})
+
 // Get a specific practice problem
 router.get("/problems/:id", async (req, res) => {
   try {
@@ -150,53 +169,6 @@ router.post("/problems/:id/run", authenticateToken, async (req, res) => {
       })
     }
 
-    // Check if problem has function signatures, if not, create default ones
-    if (!problem.functionSignatures || problem.functionSignatures.length === 0) {
-      // Create default function signatures for backward compatibility
-      problem.functionSignatures = [
-        {
-          language: "javascript",
-          functionName: "solution",
-          parameters: [{ name: "input", type: "any", description: "Input parameter" }],
-          returnType: "any",
-          template: `function solution(input) {
-    // Write your solution here
-    console.log("Input:", input);
-    
-    return null; // Replace with your solution
-}`,
-        },
-        {
-          language: "python",
-          functionName: "solution",
-          parameters: [{ name: "input", type: "any", description: "Input parameter" }],
-          returnType: "any",
-          template: `def solution(input):
-    # Write your solution here
-    print("Input:", input)
-    
-    return None  # Replace with your solution`,
-        },
-        {
-          language: "java",
-          functionName: "solution",
-          parameters: [{ name: "input", type: "Object", description: "Input parameter" }],
-          returnType: "Object",
-          template: `class Solution {
-    public Object solution(Object input) {
-        // Write your solution here
-        System.out.println("Input: " + input);
-        
-        return null; // Replace with your solution
-    }
-}`,
-        },
-      ]
-
-      // Save the updated problem
-      await problem.save()
-    }
-
     // Use only the first test case for running (example)
     const testCase = problem.testCases[0]
 
@@ -207,8 +179,8 @@ router.post("/problems/:id/run", authenticateToken, async (req, res) => {
       })
     }
 
-    // Run the code with problem-specific driver
-    const result = await runCode(code, language, problem, testCase)
+    // Run the code directly
+    const result = await runCode(code, language, testCase)
 
     if (!result.success) {
       return res.status(400).json({
@@ -253,55 +225,8 @@ router.post("/problems/:id/submit", authenticateToken, async (req, res) => {
       })
     }
 
-    // Check if problem has function signatures, if not, create default ones
-    if (!problem.functionSignatures || problem.functionSignatures.length === 0) {
-      // Create default function signatures for backward compatibility
-      problem.functionSignatures = [
-        {
-          language: "javascript",
-          functionName: "solution",
-          parameters: [{ name: "input", type: "any", description: "Input parameter" }],
-          returnType: "any",
-          template: `function solution(input) {
-    // Write your solution here
-    console.log("Input:", input);
-    
-    return null; // Replace with your solution
-}`,
-        },
-        {
-          language: "python",
-          functionName: "solution",
-          parameters: [{ name: "input", type: "any", description: "Input parameter" }],
-          returnType: "any",
-          template: `def solution(input):
-    # Write your solution here
-    print("Input:", input)
-    
-    return None  # Replace with your solution`,
-        },
-        {
-          language: "java",
-          functionName: "solution",
-          parameters: [{ name: "input", type: "Object", description: "Input parameter" }],
-          returnType: "Object",
-          template: `class Solution {
-    public Object solution(Object input) {
-        // Write your solution here
-        System.out.println("Input: " + input);
-        
-        return null; // Replace with your solution
-    }
-}`,
-        },
-      ]
-
-      // Save the updated problem
-      await problem.save()
-    }
-
-    // Evaluate code against all test cases with problem-specific driver
-    const evaluation = await evaluateCode(code, language, problem, problem.testCases)
+    // Evaluate code against all test cases
+    const evaluation = await evaluateCode(code, language, problem.testCases)
 
     if (!evaluation.success) {
       return res.status(400).json({
@@ -435,33 +360,6 @@ router.post("/problems/:id/submit", authenticateToken, async (req, res) => {
   }
 })
 
-// Get user's submissions for a problem
-router.get("/problems/:id/submissions", authenticateToken, async (req, res) => {
-  try {
-    const problemId = req.params.id
-    const userId = req.user._id
-
-    const user = await User.findById(userId)
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" })
-    }
-
-    const submissions =
-      user.submissions && Array.isArray(user.submissions)
-        ? user.submissions
-            .filter((sub) => sub.problemId && sub.problemId.toString() === problemId)
-            .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))
-            .slice(0, 20) // Last 20 submissions
-        : []
-
-    res.json({ submissions })
-  } catch (error) {
-    console.error("Error fetching submissions:", error)
-    res.status(500).json({ message: "Server error", error: error.message })
-  }
-})
-
 // Get user's practice statistics
 router.get("/stats", authenticateToken, async (req, res) => {
   try {
@@ -492,5 +390,34 @@ router.get("/stats", authenticateToken, async (req, res) => {
     })
   }
 })
+
+
+// Get user's submissions for a problem
+router.get("/problems/:id/submissions", authenticateToken, async (req, res) => {
+  try {
+    const problemId = req.params.id
+    const userId = req.user._id
+
+    const user = await User.findById(userId)
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" })
+    }
+
+    const submissions =
+      user.submissions && Array.isArray(user.submissions)
+        ? user.submissions
+            .filter((sub) => sub.problemId && sub.problemId.toString() === problemId)
+            .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))
+            .slice(0, 20) // Last 20 submissions
+        : []
+
+    res.json({ submissions })
+  } catch (error) {
+    console.error("Error fetching submissions:", error)
+    res.status(500).json({ message: "Server error", error: error.message })
+  }
+})
+
 
 module.exports = router

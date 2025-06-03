@@ -18,6 +18,10 @@ import {
   Lightbulb,
   Code2,
   Info,
+  Zap,
+  BarChart3,
+  TrendingUp,
+  Award,
 } from "lucide-react"
 import api from "../utils/api"
 import { toast } from "react-toastify"
@@ -47,6 +51,7 @@ const PracticeProblemPage = () => {
   const [testResults, setTestResults] = useState([])
   const [submissionHistory, setSubmissionHistory] = useState([])
   const [currentTestCase, setCurrentTestCase] = useState(0)
+  const [performance, setPerformance] = useState(null)
 
   // Editor settings
   const [editorSettings, setEditorSettings] = useState({
@@ -56,54 +61,93 @@ const PracticeProblemPage = () => {
     minimap: false,
   })
 
-  // Language configurations
+  // Language configurations with starter templates
   const languages = {
     javascript: {
       name: "JavaScript",
-      template: `function solution(nums) {
-  // Write your solution here
-  // You only need to implement this function
-  // The driver code will be provided automatically
-  
-  return 0; // Replace with your solution
-}`,
+      template: `// Read input from stdin
+const input = require('fs').readFileSync('/dev/stdin', 'utf8').trim();
+
+// Process input
+const lines = input.split('\\n');
+const firstLine = lines[0];
+
+// Your solution here
+console.log("Hello World");
+
+// Example: For sum of two numbers
+// const [a, b] = firstLine.split(' ').map(Number);
+// console.log(a + b);`,
       extension: "js",
     },
     python: {
       name: "Python",
-      template: `def solution(nums):
-    # Write your solution here
-    # You only need to implement this function
-    # The driver code will be provided automatically
-    
-    return 0 # Replace with your solution`,
+      template: `# Read input from stdin
+import sys
+input_data = sys.stdin.read().strip()
+
+# Process input
+lines = input_data.split('\\n')
+first_line = lines[0]
+
+# Your solution here
+print("Hello World")
+
+# Example: For sum of two numbers
+# a, b = map(int, first_line.split())
+# print(a + b)`,
       extension: "py",
     },
     java: {
       name: "Java",
-      template: `class Solution {
-    public int solution(int[] nums) {
-        // Write your solution here
-        // You only need to implement this function
-        // The driver code will be provided automatically
+      template: `import java.util.*;
+import java.io.*;
+
+public class Main {
+    public static void main(String[] args) throws IOException {
+        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
         
-        return 0; // Replace with your solution
+        // Read input
+        String firstLine = br.readLine();
+        
+        // Your solution here
+        System.out.println("Hello World");
+        
+        // Example: For sum of two numbers
+        // String[] parts = firstLine.split(" ");
+        // int a = Integer.parseInt(parts[0]);
+        // int b = Integer.parseInt(parts[1]);
+        // System.out.println(a + b);
+        
+        br.close();
     }
 }`,
       extension: "java",
     },
     cpp: {
       name: "C++",
-      template: `class Solution {
-public:
-    int solution(vector<int>& nums) {
-        // Write your solution here
-        // You only need to implement this function
-        // The driver code will be provided automatically
-        
-        return 0; // Replace with your solution
-    }
-};`,
+      template: `#include <iostream>
+#include <string>
+#include <vector>
+#include <sstream>
+using namespace std;
+
+int main() {
+    // Read input
+    string firstLine;
+    getline(cin, firstLine);
+    
+    // Your solution here
+    cout << "Hello World" << endl;
+    
+    // Example: For sum of two numbers
+    // istringstream iss(firstLine);
+    // int a, b;
+    // iss >> a >> b;
+    // cout << a + b << endl;
+    
+    return 0;
+}`,
       extension: "cpp",
     },
   }
@@ -125,8 +169,12 @@ public:
         }
 
         // Load submission history
-        const historyResponse = await api.get(`/practice/problems/${problemId}/submissions`)
-        setSubmissionHistory(historyResponse.data.submissions || [])
+        try {
+          const historyResponse = await api.get(`/practice/problems/${problemId}/submissions`)
+          setSubmissionHistory(historyResponse.data.submissions || [])
+        } catch (error) {
+          console.log("No submission history available")
+        }
       } catch (error) {
         console.error("Error fetching problem:", error)
         toast.error("Failed to load problem")
@@ -212,13 +260,18 @@ public:
       })
 
       setTestResults(response.data.results)
+      setPerformance(response.data.performance)
       setActiveTab("output")
 
       if (response.data.isCorrect) {
         toast.success("🎉 Congratulations! All test cases passed!")
         // Refresh submission history
-        const historyResponse = await api.get(`/practice/problems/${problemId}/submissions`)
-        setSubmissionHistory(historyResponse.data.submissions || [])
+        try {
+          const historyResponse = await api.get(`/practice/problems/${problemId}/submissions`)
+          setSubmissionHistory(historyResponse.data.submissions || [])
+        } catch (error) {
+          console.log("Could not refresh submission history")
+        }
       } else {
         const passedCount = response.data.results.filter((r) => r.passed).length
         toast.error(`${passedCount}/${response.data.results.length} test cases passed`)
@@ -321,6 +374,10 @@ public:
           <span className={`px-2 py-1 text-xs rounded-full ${getDifficultyColor(problem.difficulty)}`}>
             {problem.difficulty}
           </span>
+          <div className="flex items-center text-sm text-yellow-400">
+            <Award className="h-4 w-4 mr-1" />
+            {problem.trophyReward} trophies
+          </div>
         </div>
 
         <div className="flex items-center space-x-2">
@@ -499,70 +556,106 @@ public:
                     <p className="text-gray-400">Run your code to see the output</p>
                   </div>
                 ) : (
-                  testResults.map((result, index) => (
-                    <div key={index} className="bg-gray-900 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-medium">Test Case {index + 1}</h4>
-                        <div className="flex items-center">
-                          {result.passed ? (
-                            <CheckCircle className="h-5 w-5 text-green-400" />
-                          ) : (
-                            <XCircle className="h-5 w-5 text-red-400" />
-                          )}
-                          <span className={`ml-2 text-sm ${result.passed ? "text-green-400" : "text-red-400"}`}>
-                            {result.passed ? "Passed" : "Failed"}
-                          </span>
+                  <div className="space-y-4">
+                    {/* Performance Insights */}
+                    {performance && (
+                      <div className="bg-gradient-to-r from-purple-900/20 to-blue-900/20 border border-purple-700 rounded-lg p-4">
+                        <h4 className="font-medium text-purple-400 mb-3 flex items-center">
+                          <BarChart3 className="h-5 w-5 mr-2" />
+                          Performance Insights
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="bg-gray-800 rounded-lg p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm text-gray-400">Time Complexity</span>
+                              <TrendingUp className="h-4 w-4 text-green-400" />
+                            </div>
+                            <p className="text-sm font-medium text-white">{performance.timeComplexity}</p>
+                          </div>
+                          <div className="bg-gray-800 rounded-lg p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm text-gray-400">Space Complexity</span>
+                              <Zap className="h-4 w-4 text-blue-400" />
+                            </div>
+                            <p className="text-sm font-medium text-white">{performance.spaceComplexity}</p>
+                          </div>
+                          <div className="bg-gray-800 rounded-lg p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm text-gray-400">Efficiency Score</span>
+                              <Award className="h-4 w-4 text-yellow-400" />
+                            </div>
+                            <p className="text-sm font-medium text-white">{performance.efficiency}%</p>
+                          </div>
                         </div>
                       </div>
+                    )}
 
-                      <div className="space-y-3">
-                        <div>
-                          <span className="text-sm font-medium text-gray-400">Input:</span>
-                          <pre className="mt-1 text-sm bg-gray-800 p-2 rounded overflow-x-auto">{result.input}</pre>
+                    {/* Test Results */}
+                    {testResults.map((result, index) => (
+                      <div key={index} className="bg-gray-900 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="font-medium">Test Case {index + 1}</h4>
+                          <div className="flex items-center">
+                            {result.passed ? (
+                              <CheckCircle className="h-5 w-5 text-green-400" />
+                            ) : (
+                              <XCircle className="h-5 w-5 text-red-400" />
+                            )}
+                            <span className={`ml-2 text-sm ${result.passed ? "text-green-400" : "text-red-400"}`}>
+                              {result.passed ? "Passed" : "Failed"}
+                            </span>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-sm font-medium text-gray-400">Expected Output:</span>
-                          <pre className="mt-1 text-sm bg-gray-800 p-2 rounded overflow-x-auto">
-                            {result.expectedOutput}
-                          </pre>
-                        </div>
-                        <div>
-                          <span className="text-sm font-medium text-gray-400">Your Output:</span>
-                          <pre
-                            className={`mt-1 text-sm p-2 rounded overflow-x-auto ${
-                              result.passed
-                                ? "bg-green-900/20 border border-green-700"
-                                : "bg-red-900/20 border border-red-700"
-                            }`}
-                          >
-                            {result.actualOutput || "No output"}
-                          </pre>
-                        </div>
-                        {result.stdout && result.stdout !== result.actualOutput && (
+
+                        <div className="space-y-3">
                           <div>
-                            <span className="text-sm font-medium text-blue-400">Console Output:</span>
-                            <pre className="mt-1 text-sm bg-blue-900/20 border border-blue-700 p-2 rounded overflow-x-auto">
-                              {result.stdout}
+                            <span className="text-sm font-medium text-gray-400">Input:</span>
+                            <pre className="mt-1 text-sm bg-gray-800 p-2 rounded overflow-x-auto">{result.input}</pre>
+                          </div>
+                          <div>
+                            <span className="text-sm font-medium text-gray-400">Expected Output:</span>
+                            <pre className="mt-1 text-sm bg-gray-800 p-2 rounded overflow-x-auto">
+                              {result.expectedOutput}
                             </pre>
                           </div>
-                        )}
-                        {result.stderr && (
                           <div>
-                            <span className="text-sm font-medium text-red-400">Error:</span>
-                            <pre className="mt-1 text-sm bg-red-900/20 border border-red-700 p-2 rounded overflow-x-auto">
-                              {result.stderr}
+                            <span className="text-sm font-medium text-gray-400">Your Output:</span>
+                            <pre
+                              className={`mt-1 text-sm p-2 rounded overflow-x-auto ${
+                                result.passed
+                                  ? "bg-green-900/20 border border-green-700"
+                                  : "bg-red-900/20 border border-red-700"
+                              }`}
+                            >
+                              {result.actualOutput || "No output"}
                             </pre>
                           </div>
-                        )}
-                        {result.executionTime && (
-                          <div className="flex items-center text-sm text-gray-400">
-                            <Clock className="h-4 w-4 mr-1" />
-                            Execution Time: {result.executionTime}ms
-                          </div>
-                        )}
+                          {result.stdout && result.stdout !== result.actualOutput && (
+                            <div>
+                              <span className="text-sm font-medium text-blue-400">Console Output:</span>
+                              <pre className="mt-1 text-sm bg-blue-900/20 border border-blue-700 p-2 rounded overflow-x-auto">
+                                {result.stdout}
+                              </pre>
+                            </div>
+                          )}
+                          {result.stderr && (
+                            <div>
+                              <span className="text-sm font-medium text-red-400">Error:</span>
+                              <pre className="mt-1 text-sm bg-red-900/20 border border-red-700 p-2 rounded overflow-x-auto">
+                                {result.stderr}
+                              </pre>
+                            </div>
+                          )}
+                          {result.executionTime && (
+                            <div className="flex items-center text-sm text-gray-400">
+                              <Clock className="h-4 w-4 mr-1" />
+                              Execution Time: {result.executionTime}ms
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    ))}
+                  </div>
                 )}
               </div>
             )}
@@ -669,20 +762,14 @@ public:
               <div className="flex items-start">
                 <Info className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
                 <div>
-                  <p className="font-medium mb-1">Instructions:</p>
+                  <p className="font-medium mb-1">HackerRank Style Instructions:</p>
                   <ul className="list-disc list-inside space-y-1 ml-1">
-                    <li>
-                      Only implement the <code className="bg-blue-900/50 px-1 rounded">solution</code> function. The
-                      driver code will be provided automatically.
-                    </li>
-                    <li>Your function should accept the input parameters and return the expected output.</li>
-                    <li>
-                      You can use <code className="bg-blue-900/50 px-1 rounded">console.log</code> or{" "}
-                      <code className="bg-blue-900/50 px-1 rounded">print</code> for debugging - these will appear in
-                      the output.
-                    </li>
-                    <li>Click "Run" to test your solution against a single test case.</li>
-                    <li>Click "Submit" to test against all test cases.</li>
+                    <li>Write complete code that reads from stdin and writes to stdout</li>
+                    <li>Use the provided template as a starting point</li>
+                    <li>Your code will be tested against multiple test cases</li>
+                    <li>Make sure your output format exactly matches the expected output</li>
+                    <li>Click "Run" to test against the first example</li>
+                    <li>Click "Submit" to test against all test cases</li>
                   </ul>
                 </div>
               </div>

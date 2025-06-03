@@ -1,109 +1,85 @@
 const mongoose = require("mongoose")
 
-const functionSignatureSchema = new mongoose.Schema({
-  language: {
-    type: String,
-    required: true,
-    enum: ["javascript", "python", "java", "cpp"],
-  },
-  functionName: {
+const TestCaseSchema = new mongoose.Schema({
+  input: {
     type: String,
     required: true,
   },
-  parameters: [
-    {
-      name: String,
-      type: String,
-      description: String,
-    },
-  ],
-  returnType: {
+  output: {
     type: String,
     required: true,
   },
-  template: {
-    type: String,
-    required: true,
+  isHidden: {
+    type: Boolean,
+    default: false,
   },
 })
 
-const problemSchema = new mongoose.Schema(
-  {
-    title: {
+const ProblemSchema = new mongoose.Schema({
+  title: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+  description: {
+    type: String,
+    required: true,
+  },
+  difficulty: {
+    type: String,
+    enum: ["Easy", "Medium", "Hard"],
+    required: true,
+  },
+  tags: [
+    {
       type: String,
-      required: true,
       trim: true,
     },
-    description: {
-      type: String,
-      required: true,
+  ],
+  examples: [
+    {
+      input: String,
+      output: String,
+      explanation: String,
     },
-    difficulty: {
-      type: String,
-      required: true,
-      enum: ["Easy", "Medium", "Hard"],
-    },
-    tags: [String],
-    examples: [
-      {
-        input: String,
-        output: String,
-        explanation: String,
-      },
-    ],
-    constraints: String,
-    hints: [String],
-    functionSignatures: [functionSignatureSchema],
-    testCases: [
-      {
-        input: mongoose.Schema.Types.Mixed,
-        output: mongoose.Schema.Types.Mixed,
-        isHidden: {
-          type: Boolean,
-          default: false,
-        },
-      },
-    ],
-    timeLimit: {
-      type: Number,
-      default: 1800, // 30 minutes in seconds
-    },
-    memoryLimit: {
-      type: Number,
-      default: 256, // MB
-    },
-    solvedCount: {
-      type: Number,
-      default: 0,
-    },
-    submissionCount: {
-      type: Number,
-      default: 0,
-    },
-    acceptanceRate: {
-      type: Number,
-      default: 0,
-    },
-    createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-    },
+  ],
+  constraints: String,
+  hints: [String],
+  testCases: [TestCaseSchema],
+  timeLimit: {
+    type: Number,
+    default: 1800, // 30 minutes in seconds
   },
-  {
-    timestamps: true,
+  memoryLimit: {
+    type: Number,
+    default: 256, // MB
   },
-)
+  solvedCount: {
+    type: Number,
+    default: 0,
+  },
+  submissionCount: {
+    type: Number,
+    default: 0,
+  },
+  acceptanceRate: {
+    type: Number,
+    default: 0,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+})
 
 // Virtual field for trophy reward
-problemSchema.virtual("trophyReward").get(function () {
+ProblemSchema.virtual("trophyReward").get(function () {
   const rewards = { Easy: 5, Medium: 10, Hard: 15 }
   return rewards[this.difficulty] || 0
 })
 
 // Ensure virtual fields are serialized
-problemSchema.set("toJSON", { virtuals: true })
-problemSchema.set("toObject", { virtuals: true })
+ProblemSchema.set("toJSON", { virtuals: true })
+ProblemSchema.set("toObject", { virtuals: true })
 
-const Problem = mongoose.model("Problem", problemSchema)
-
-module.exports = Problem
+module.exports = mongoose.model("Problem", ProblemSchema)
