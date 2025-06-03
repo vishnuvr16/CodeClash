@@ -58,7 +58,7 @@ app.use("/api/", limiter)
 // API routes
 app.use("/api/auth", authRoutes)
 app.use("/api/problems", problemRoutes)
-app.use("/api/users", userRoutes)
+app.use("/api/user", userRoutes)
 app.use("/api/leaderboard", leaderboardRoutes)
 app.use("/api/matches", matchRoutes)
 app.use("/api/practice", practiceRoutes)
