@@ -2,7 +2,7 @@ const express = require("express")
 const Match = require("../models/Match")
 const Problem = require("../models/Problem")
 const User = require("../models/User")
-const {authenticateToken} = require("../middleware/auth")
+const { authenticateToken } = require("../middleware/auth")
 const { evaluateCode, runCode } = require("../utils/codeEvaluation")
 
 const router = express.Router()
@@ -19,10 +19,20 @@ router.get("/:id", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params
 
+    // Validate ObjectId format to prevent MongoDB errors
+    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid match ID format",
+      })
+    }
+
     const match = await Match.findById(id)
       .populate("userA", "username trophies")
       .populate("userB", "username trophies")
       .populate("problem")
+      .populate("winner", "username")
+      .populate("concedeBy", "username")
 
     if (!match) {
       return res.status(404).json({
@@ -32,7 +42,10 @@ router.get("/:id", authenticateToken, async (req, res) => {
     }
 
     // Check if user is part of the match
-    if (match.userA._id.toString() !== req.user.id && match.userB._id.toString() !== req.user.id) {
+    if (
+      match.userA._id.toString() !== req.user._id.toString() &&
+      match.userB._id.toString() !== req.user._id.toString()
+    ) {
       return res.status(403).json({
         success: false,
         message: "Not authorized to view this match",
@@ -66,6 +79,14 @@ router.post("/:id/run", authenticateToken, async (req, res) => {
       })
     }
 
+    // Validate ObjectId format
+    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid match ID format",
+      })
+    }
+
     // Find the match
     const match = await Match.findById(id).populate("problem")
     if (!match) {
@@ -76,7 +97,7 @@ router.post("/:id/run", authenticateToken, async (req, res) => {
     }
 
     // Check if user is part of the match
-    if (match.userA.toString() !== req.user.id && match.userB.toString() !== req.user.id) {
+    if (match.userA.toString() !== req.user._id.toString() && match.userB.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
         message: "Not authorized to run code in this match",
@@ -130,6 +151,14 @@ router.post("/:id/submit", authenticateToken, async (req, res) => {
       })
     }
 
+    // Validate ObjectId format
+    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid match ID format",
+      })
+    }
+
     // Find the match
     const match = await Match.findById(id).populate("problem")
     if (!match) {
@@ -140,7 +169,7 @@ router.post("/:id/submit", authenticateToken, async (req, res) => {
     }
 
     // Check if user is part of the match
-    if (match.userA.toString() !== req.user.id && match.userB.toString() !== req.user.id) {
+    if (match.userA.toString() !== req.user._id.toString() && match.userB.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
         message: "Not authorized to submit in this match",
@@ -166,26 +195,23 @@ router.post("/:id/submit", authenticateToken, async (req, res) => {
     }
 
     const isCorrect = evaluation.allPassed
-    const userId = req.user.id
-    const isUserA = match.userA.toString() === userId
+    const userId = req.user._id
+    const isUserA = match.userA.toString() === userId.toString()
 
-    // Update match with submission
-    const submissionData = {
+    // Create submission object
+    const submission = {
+      user: userId,
       code,
       language,
-      submittedAt: new Date(),
       isCorrect,
-      testResults: evaluation.results,
-      performance: evaluation.performance,
-      executionTime: evaluation.avgExecutionTime,
-      memoryUsed: evaluation.maxMemoryUsed,
+      isSubmitted: true,
+      timeTaken: Math.floor((new Date() - match.startTime) / 1000),
+      submittedAt: new Date(),
+      updatedAt: new Date(),
     }
 
-    if (isUserA) {
-      match.userASubmission = submissionData
-    } else {
-      match.userBSubmission = submissionData
-    }
+    // Add submission to match
+    match.submissions.push(submission)
 
     // If this is a correct solution, end the match
     if (isCorrect) {
@@ -247,6 +273,14 @@ router.post("/:id/concede", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params
 
+    // Validate ObjectId format
+    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid match ID format",
+      })
+    }
+
     // Find the match
     const match = await Match.findById(id)
     if (!match) {
@@ -257,7 +291,7 @@ router.post("/:id/concede", authenticateToken, async (req, res) => {
     }
 
     // Check if user is part of the match
-    if (match.userA.toString() !== req.user.id && match.userB.toString() !== req.user.id) {
+    if (match.userA.toString() !== req.user._id.toString() && match.userB.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
         message: "Not authorized to concede this match",
@@ -272,8 +306,8 @@ router.post("/:id/concede", authenticateToken, async (req, res) => {
       })
     }
 
-    const userId = req.user.id
-    const isUserA = match.userA.toString() === userId
+    const userId = req.user._id
+    const isUserA = match.userA.toString() === userId.toString()
     const winnerId = isUserA ? match.userB : match.userA
 
     // Update match

@@ -34,9 +34,9 @@ const LandingPage = () => {
   ]
 
   const stats = [
-    { value: "10,000+", label: "Active Users" },
-    { value: "500+", label: "Algorithm Challenges" },
-    { value: "25,000+", label: "Duels Completed" },
+    { value: "1000+", label: "Active Users" },
+    { value: "50+", label: "Algorithm Challenges" },
+    { value: "2500+", label: "Duels Completed" },
     { value: "98%", label: "User Satisfaction" }
   ]
 

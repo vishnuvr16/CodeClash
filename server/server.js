@@ -4,6 +4,11 @@ const cors = require("cors")
 const http = require("http")
 const socketIo = require("socket.io")
 const path = require("path")
+const helmet = require("helmet")
+const mongoSanitize = require("express-mongo-sanitize")
+const xss = require("xss-clean")
+const rateLimit = require("express-rate-limit")
+const { sanitizeInputs } = require("./middleware/auth")
 require("dotenv").config()
 
 // Import routes
@@ -15,48 +20,109 @@ const matchRoutes = require("./routes/matches")
 const practiceRoutes = require("./routes/practice")
 
 // Import socket handlers
-const { setupSocketHandlers } = require("./Socket/SocketHandlers")
+const { setupSocketHandlers } = require("./socket/socketHandlers")
 
 // Create Express app
 const app = express()
 const server = http.createServer(app)
 
-// Apply CORS middleware
-app.use(
-  cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
-    credentials: true,
-  }),
-)
+// Configure CORS with specific options
+const corsOptions = {
+  origin: process.env.CLIENT_URL || "http://localhost:5173",
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
+}
 
-// Middleware
-app.use(express.json())
-app.use(express.urlencoded({ extended: true }))
+// Apply security middleware
+app.use(helmet()) // Set security headers
+app.use(cors(corsOptions))
+app.use(express.json({ limit: "10kb" })) // Limit JSON body size
+app.use(express.urlencoded({ extended: true, limit: "10kb" }))
+app.use(mongoSanitize()) // Prevent MongoDB operator injection
+app.use(xss()) // Sanitize user input
+app.use(sanitizeInputs) // Custom sanitization middleware
+
+// Apply rate limiting to all requests
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+app.use("/api/", limiter)
 
 // API routes
 app.use("/api/auth", authRoutes)
 app.use("/api/problems", problemRoutes)
-app.use("/api/user", userRoutes)
+app.use("/api/users", userRoutes)
 app.use("/api/leaderboard", leaderboardRoutes)
-app.use("/api/match", matchRoutes)
+app.use("/api/matches", matchRoutes)
 app.use("/api/practice", practiceRoutes)
 
-// Set up Socket.IO with CORS
+// Set up Socket.IO with CORS and security
 const io = socketIo(server, {
   cors: {
     origin: process.env.CLIENT_URL || "http://localhost:5173",
     methods: ["GET", "POST"],
     credentials: true,
   },
+  // Add security settings
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  cookie: {
+    name: "io",
+    path: "/",
+    httpOnly: true,
+    sameSite: "strict",
+  },
 })
 
 // Set up socket handlers
 setupSocketHandlers(io)
 
+// Serve static files in production
+if (process.env.NODE_ENV === "production") {
+  // Set security headers for static files
+  app.use(
+    express.static(path.join(__dirname, "../client/dist"), {
+      setHeaders: (res, path) => {
+        res.setHeader("X-Content-Type-Options", "nosniff")
+        res.setHeader("X-Frame-Options", "DENY")
+        res.setHeader("X-XSS-Protection", "1; mode=block")
+      },
+    }),
+  )
 
-// Connect to MongoDB
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(__dirname, "../client/dist/index.html"))
+  })
+}
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack)
+  res.status(500).json({
+    message: "Something went wrong!",
+    error: process.env.NODE_ENV === "development" ? err.message : undefined,
+  })
+})
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ message: "Route not found" })
+})
+
+// Connect to MongoDB with enhanced options
 mongoose
-  .connect(process.env.MONGODB_URI || "mongodb://localhost:27017/peerprep_duel")
+  .connect(process.env.MONGODB_URI || "mongodb://localhost:27017/peerprep_duel", {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 45000,
+  })
   .then(() => {
     console.log("Connected to MongoDB")
 
@@ -68,10 +134,16 @@ mongoose
   })
   .catch((err) => {
     console.error("MongoDB connection error:", err)
+    process.exit(1)
   })
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack)
-  res.status(500).json({ message: "Something went wrong!" })
+// Graceful shutdown
+process.on("SIGTERM", () => {
+  console.log("SIGTERM received, shutting down gracefully")
+  server.close(() => {
+    console.log("Process terminated")
+    mongoose.connection.close(false, () => {
+      process.exit(0)
+    })
+  })
 })

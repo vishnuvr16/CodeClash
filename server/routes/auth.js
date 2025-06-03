@@ -3,13 +3,62 @@ const jwt = require("jsonwebtoken")
 const axios = require("axios")
 const User = require("../models/User")
 const { authenticateToken } = require("../middleware/auth")
+const crypto = require("crypto")
+const rateLimit = require("express-rate-limit")
 
 const router = express.Router()
 
+// Rate limiting for login attempts
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 requests per windowMs
+  message: { message: "Too many login attempts, please try again later" },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+// Rate limiting for registration
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5, // 5 accounts per hour
+  message: { message: "Too many accounts created, please try again later" },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
 // Register a new user
-router.post("/register", async (req, res) => {
+router.post("/register", registerLimiter, async (req, res) => {
   try {
     const { username, email, password } = req.body
+
+    // Input validation
+    if (!username || !email || !password) {
+      return res.status(400).json({
+        message: "All fields are required",
+      })
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({
+        message: "Password must be at least 8 characters long",
+      })
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        message: "Invalid email format",
+      })
+    }
+
+    // Username validation (alphanumeric + underscore)
+    const usernameRegex = /^[a-zA-Z0-9_]+$/
+    if (!usernameRegex.test(username)) {
+      return res.status(400).json({
+        message: "Username can only contain letters, numbers, and underscores",
+      })
+    }
 
     // Check if user already exists
     const existingUser = await User.findOne({
@@ -43,9 +92,17 @@ router.post("/register", async (req, res) => {
 })
 
 // Login user
-router.post("/login", async (req, res) => {
+router.post("/login", loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body
+    const clientIp = req.headers["x-forwarded-for"] || req.connection.remoteAddress
+
+    // Input validation
+    if (!email || !password) {
+      return res.status(400).json({
+        message: "Email and password are required",
+      })
+    }
 
     // Find user by email
     const user = await User.findOne({ email })
@@ -56,16 +113,42 @@ router.post("/login", async (req, res) => {
       })
     }
 
+    // Check if account is locked
+    if (user.accountLocked) {
+      return res.status(401).json({
+        message: "Account is locked due to too many failed login attempts. Please reset your password.",
+      })
+    }
+
     // Check password
     const isMatch = await user.comparePassword(password)
 
     if (!isMatch) {
+      // Increment failed login attempts
+      user.failedLoginAttempts += 1
+
+      // Lock account after 5 failed attempts
+      if (user.failedLoginAttempts >= 5) {
+        user.accountLocked = true
+      }
+
+      await user.save()
+
       return res.status(401).json({
         message: "Invalid email or password",
       })
     }
 
-    // Create JWT token
+    // Reset failed login attempts on successful login
+    user.failedLoginAttempts = 0
+    user.accountLocked = false
+    user.lastLogin = {
+      date: new Date(),
+      ip: clientIp,
+    }
+    await user.save()
+
+    // Create JWT token with appropriate expiration
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || "your_jwt_secret", { expiresIn: "7d" })
 
     // Return user data without password
@@ -73,7 +156,7 @@ router.post("/login", async (req, res) => {
       _id: user._id,
       username: user.username,
       email: user.email,
-      rating: user.rating,
+      trophies: user.trophies,
       profilePicture: user.profilePicture,
     }
 
@@ -89,10 +172,11 @@ router.post("/login", async (req, res) => {
   }
 })
 
-// Google OAuth callback
+// Google OAuth callback with enhanced security
 router.post("/google/callback", async (req, res) => {
   try {
     const { code, redirectUri } = req.body
+    const clientIp = req.headers["x-forwarded-for"] || req.connection.remoteAddress
 
     if (!code) {
       return res.status(400).json({
@@ -160,6 +244,13 @@ router.post("/google/callback", async (req, res) => {
       await user.save()
     }
 
+    // Update last login information
+    user.lastLogin = {
+      date: new Date(),
+      ip: clientIp,
+    }
+    await user.save()
+
     // Create JWT token
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || "your_jwt_secret", { expiresIn: "7d" })
 
@@ -168,7 +259,7 @@ router.post("/google/callback", async (req, res) => {
       _id: user._id,
       username: user.username,
       email: user.email,
-      rating: user.rating,
+      trophies: user.trophies,
       profilePicture: user.profilePicture,
     }
 
@@ -205,6 +296,25 @@ router.put("/profile", authenticateToken, async (req, res) => {
     const { username, email } = req.body
     const userId = req.user._id
 
+    // Input validation
+    if (username) {
+      const usernameRegex = /^[a-zA-Z0-9_]+$/
+      if (!usernameRegex.test(username)) {
+        return res.status(400).json({
+          message: "Username can only contain letters, numbers, and underscores",
+        })
+      }
+    }
+
+    if (email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({
+          message: "Invalid email format",
+        })
+      }
+    }
+
     // Check if username or email is already taken
     if (username || email) {
       const existingUser = await User.findOne({
@@ -235,11 +345,24 @@ router.put("/profile", authenticateToken, async (req, res) => {
   }
 })
 
-// Change password
+// Change password with security checks
 router.put("/change-password", authenticateToken, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body
     const userId = req.user._id
+
+    // Input validation
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        message: "Current password and new password are required",
+      })
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        message: "New password must be at least 8 characters long",
+      })
+    }
 
     // Get user with password
     const user = await User.findById(userId)
@@ -270,6 +393,94 @@ router.put("/change-password", authenticateToken, async (req, res) => {
     console.error("Password change error:", error)
     res.status(500).json({
       message: "Server error during password change",
+    })
+  }
+})
+
+// Request password reset
+router.post("/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body
+
+    if (!email) {
+      return res.status(400).json({
+        message: "Email is required",
+      })
+    }
+
+    const user = await User.findOne({ email })
+
+    if (!user) {
+      // Don't reveal that the user doesn't exist
+      return res.status(200).json({
+        message: "If your email is registered, you will receive a password reset link",
+      })
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString("hex")
+    user.resetPasswordToken = resetToken
+    user.resetPasswordExpires = Date.now() + 3600000 // 1 hour
+    await user.save()
+
+    // In a real application, send an email with the reset link
+    // For now, just return the token for testing
+    res.status(200).json({
+      message: "If your email is registered, you will receive a password reset link",
+      // Only include token in development
+      ...(process.env.NODE_ENV !== "production" && { resetToken }),
+    })
+  } catch (error) {
+    console.error("Forgot password error:", error)
+    res.status(500).json({
+      message: "Server error during password reset request",
+    })
+  }
+})
+
+// Reset password with token
+router.post("/reset-password", async (req, res) => {
+  try {
+    const { token, newPassword } = req.body
+
+    if (!token || !newPassword) {
+      return res.status(400).json({
+        message: "Token and new password are required",
+      })
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        message: "Password must be at least 8 characters long",
+      })
+    }
+
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() },
+    })
+
+    if (!user) {
+      return res.status(400).json({
+        message: "Password reset token is invalid or has expired",
+      })
+    }
+
+    // Update password and clear reset token
+    user.password = newPassword
+    user.resetPasswordToken = undefined
+    user.resetPasswordExpires = undefined
+    user.accountLocked = false
+    user.failedLoginAttempts = 0
+    await user.save()
+
+    res.status(200).json({
+      message: "Password has been reset successfully",
+    })
+  } catch (error) {
+    console.error("Reset password error:", error)
+    res.status(500).json({
+      message: "Server error during password reset",
     })
   }
 })
