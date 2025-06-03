@@ -120,13 +120,3 @@ mongoose
     process.exit(1)
   })
 
-// Graceful shutdown
-process.on("SIGTERM", () => {
-  console.log("SIGTERM received, shutting down gracefully")
-  server.close(() => {
-    console.log("Process terminated")
-    mongoose.connection.close(false, () => {
-      process.exit(0)
-    })
-  })
-})
