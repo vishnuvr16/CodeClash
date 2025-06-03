@@ -22,6 +22,9 @@ import {
   BarChart3,
   TrendingUp,
   Award,
+  Eye,
+  EyeOff,
+  Activity,
 } from "lucide-react"
 import api from "../utils/api"
 import { toast } from "react-toastify"
@@ -52,6 +55,7 @@ const PracticeProblemPage = () => {
   const [submissionHistory, setSubmissionHistory] = useState([])
   const [currentTestCase, setCurrentTestCase] = useState(0)
   const [performance, setPerformance] = useState(null)
+  const [hiddenTestSummary, setHiddenTestSummary] = useState(null)
 
   // Editor settings
   const [editorSettings, setEditorSettings] = useState({
@@ -261,6 +265,7 @@ int main() {
 
       setTestResults(response.data.results)
       setPerformance(response.data.performance)
+      setHiddenTestSummary(response.data.hiddenTestSummary)
       setActiveTab("output")
 
       if (response.data.isCorrect) {
@@ -273,8 +278,7 @@ int main() {
           console.log("Could not refresh submission history")
         }
       } else {
-        const passedCount = response.data.results.filter((r) => r.passed).length
-        toast.error(`${passedCount}/${response.data.results.length} test cases passed`)
+        toast.error(response.data.message)
       }
     } catch (error) {
       console.error("Error submitting code:", error)
@@ -557,104 +561,170 @@ int main() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {/* Performance Insights */}
+                    {/* Performance Insights - LeetCode Style */}
                     {performance && (
-                      <div className="bg-gradient-to-r from-purple-900/20 to-blue-900/20 border border-purple-700 rounded-lg p-4">
-                        <h4 className="font-medium text-purple-400 mb-3 flex items-center">
+                      <div className="bg-gradient-to-r from-green-900/20 to-blue-900/20 border border-green-700 rounded-lg p-6">
+                        <h4 className="font-medium text-green-400 mb-4 flex items-center">
                           <BarChart3 className="h-5 w-5 mr-2" />
-                          Performance Insights
+                          Performance Analysis
                         </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div className="bg-gray-800 rounded-lg p-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm text-gray-400">Time Complexity</span>
-                              <TrendingUp className="h-4 w-4 text-green-400" />
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                          <div className="space-y-4">
+                            <div className="bg-gray-800 rounded-lg p-4">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm text-gray-400">Runtime</span>
+                                <Clock className="h-4 w-4 text-green-400" />
+                              </div>
+                              <p className="text-2xl font-bold text-white">{performance.runtime}</p>
+                              <p className="text-xs text-green-400">Beats {performance.percentile}% of submissions</p>
                             </div>
-                            <p className="text-sm font-medium text-white">{performance.timeComplexity}</p>
+
+                            <div className="bg-gray-800 rounded-lg p-4">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm text-gray-400">Memory</span>
+                                <Activity className="h-4 w-4 text-blue-400" />
+                              </div>
+                              <p className="text-2xl font-bold text-white">{performance.memory}</p>
+                              <p className="text-xs text-blue-400">Beats {performance.percentile}% of submissions</p>
+                            </div>
                           </div>
-                          <div className="bg-gray-800 rounded-lg p-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm text-gray-400">Space Complexity</span>
-                              <Zap className="h-4 w-4 text-blue-400" />
+
+                          <div className="space-y-4">
+                            <div className="bg-gray-800 rounded-lg p-4">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm text-gray-400">Time Complexity</span>
+                                <TrendingUp className="h-4 w-4 text-purple-400" />
+                              </div>
+                              <p className="text-lg font-medium text-white">{performance.timeComplexity}</p>
                             </div>
-                            <p className="text-sm font-medium text-white">{performance.spaceComplexity}</p>
+
+                            <div className="bg-gray-800 rounded-lg p-4">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm text-gray-400">Space Complexity</span>
+                                <Zap className="h-4 w-4 text-cyan-400" />
+                              </div>
+                              <p className="text-lg font-medium text-white">{performance.spaceComplexity}</p>
+                            </div>
                           </div>
-                          <div className="bg-gray-800 rounded-lg p-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm text-gray-400">Efficiency Score</span>
-                              <Award className="h-4 w-4 text-yellow-400" />
+                        </div>
+
+                        <div className="bg-gray-800 rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm text-gray-400">Overall Efficiency Score</span>
+                            <Award className="h-4 w-4 text-yellow-400" />
+                          </div>
+                          <div className="flex items-center">
+                            <div className="flex-1 bg-gray-700 rounded-full h-3 mr-3">
+                              <div
+                                className="bg-gradient-to-r from-yellow-400 to-green-500 h-3 rounded-full transition-all duration-500"
+                                style={{ width: `${performance.efficiency}%` }}
+                              ></div>
                             </div>
-                            <p className="text-sm font-medium text-white">{performance.efficiency}%</p>
+                            <span className="text-lg font-bold text-yellow-400">{performance.efficiency}%</span>
                           </div>
                         </div>
                       </div>
                     )}
 
-                    {/* Test Results */}
-                    {testResults.map((result, index) => (
-                      <div key={index} className="bg-gray-900 rounded-lg p-4">
+                    {/* Hidden Test Cases Summary */}
+                    {hiddenTestSummary && (
+                      <div className="bg-gray-800 border border-gray-600 rounded-lg p-4">
                         <div className="flex items-center justify-between mb-3">
-                          <h4 className="font-medium">Test Case {index + 1}</h4>
-                          <div className="flex items-center">
-                            {result.passed ? (
-                              <CheckCircle className="h-5 w-5 text-green-400" />
-                            ) : (
-                              <XCircle className="h-5 w-5 text-red-400" />
-                            )}
-                            <span className={`ml-2 text-sm ${result.passed ? "text-green-400" : "text-red-400"}`}>
-                              {result.passed ? "Passed" : "Failed"}
-                            </span>
+                          <h4 className="font-medium text-gray-300 flex items-center">
+                            <EyeOff className="h-5 w-5 mr-2" />
+                            Hidden Test Cases
+                          </h4>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm text-green-400">{hiddenTestSummary.passed} passed</span>
+                            <span className="text-sm text-red-400">{hiddenTestSummary.failed} failed</span>
                           </div>
                         </div>
-
-                        <div className="space-y-3">
-                          <div>
-                            <span className="text-sm font-medium text-gray-400">Input:</span>
-                            <pre className="mt-1 text-sm bg-gray-800 p-2 rounded overflow-x-auto">{result.input}</pre>
+                        <div className="flex items-center">
+                          <div className="flex-1 bg-gray-700 rounded-full h-2 mr-3">
+                            <div
+                              className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${(hiddenTestSummary.passed / hiddenTestSummary.total) * 100}%` }}
+                            ></div>
                           </div>
-                          <div>
-                            <span className="text-sm font-medium text-gray-400">Expected Output:</span>
-                            <pre className="mt-1 text-sm bg-gray-800 p-2 rounded overflow-x-auto">
-                              {result.expectedOutput}
-                            </pre>
-                          </div>
-                          <div>
-                            <span className="text-sm font-medium text-gray-400">Your Output:</span>
-                            <pre
-                              className={`mt-1 text-sm p-2 rounded overflow-x-auto ${
-                                result.passed
-                                  ? "bg-green-900/20 border border-green-700"
-                                  : "bg-red-900/20 border border-red-700"
-                              }`}
-                            >
-                              {result.actualOutput || "No output"}
-                            </pre>
-                          </div>
-                          {result.stdout && result.stdout !== result.actualOutput && (
-                            <div>
-                              <span className="text-sm font-medium text-blue-400">Console Output:</span>
-                              <pre className="mt-1 text-sm bg-blue-900/20 border border-blue-700 p-2 rounded overflow-x-auto">
-                                {result.stdout}
-                              </pre>
-                            </div>
-                          )}
-                          {result.stderr && (
-                            <div>
-                              <span className="text-sm font-medium text-red-400">Error:</span>
-                              <pre className="mt-1 text-sm bg-red-900/20 border border-red-700 p-2 rounded overflow-x-auto">
-                                {result.stderr}
-                              </pre>
-                            </div>
-                          )}
-                          {result.executionTime && (
-                            <div className="flex items-center text-sm text-gray-400">
-                              <Clock className="h-4 w-4 mr-1" />
-                              Execution Time: {result.executionTime}ms
-                            </div>
-                          )}
+                          <span className="text-sm text-gray-400">
+                            {hiddenTestSummary.passed}/{hiddenTestSummary.total}
+                          </span>
                         </div>
                       </div>
-                    ))}
+                    )}
+
+                    {/* Visible Test Results */}
+                    <div className="space-y-4">
+                      <h4 className="font-medium text-gray-300 flex items-center">
+                        <Eye className="h-5 w-5 mr-2" />
+                        Sample Test Cases
+                      </h4>
+                      {testResults.map((result, index) => (
+                        <div key={index} className="bg-gray-900 rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <h5 className="font-medium">Test Case {index + 1}</h5>
+                            <div className="flex items-center">
+                              {result.passed ? (
+                                <CheckCircle className="h-5 w-5 text-green-400" />
+                              ) : (
+                                <XCircle className="h-5 w-5 text-red-400" />
+                              )}
+                              <span className={`ml-2 text-sm ${result.passed ? "text-green-400" : "text-red-400"}`}>
+                                {result.passed ? "Passed" : "Failed"}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-3">
+                            <div>
+                              <span className="text-sm font-medium text-gray-400">Input:</span>
+                              <pre className="mt-1 text-sm bg-gray-800 p-2 rounded overflow-x-auto">{result.input}</pre>
+                            </div>
+                            <div>
+                              <span className="text-sm font-medium text-gray-400">Expected Output:</span>
+                              <pre className="mt-1 text-sm bg-gray-800 p-2 rounded overflow-x-auto">
+                                {result.expectedOutput}
+                              </pre>
+                            </div>
+                            <div>
+                              <span className="text-sm font-medium text-gray-400">Your Output:</span>
+                              <pre
+                                className={`mt-1 text-sm p-2 rounded overflow-x-auto ${
+                                  result.passed
+                                    ? "bg-green-900/20 border border-green-700"
+                                    : "bg-red-900/20 border border-red-700"
+                                }`}
+                              >
+                                {result.actualOutput || "No output"}
+                              </pre>
+                            </div>
+                            {result.stdout && result.stdout !== result.actualOutput && (
+                              <div>
+                                <span className="text-sm font-medium text-blue-400">Console Output:</span>
+                                <pre className="mt-1 text-sm bg-blue-900/20 border border-blue-700 p-2 rounded overflow-x-auto">
+                                  {result.stdout}
+                                </pre>
+                              </div>
+                            )}
+                            {result.stderr && (
+                              <div>
+                                <span className="text-sm font-medium text-red-400">Error:</span>
+                                <pre className="mt-1 text-sm bg-red-900/20 border border-red-700 p-2 rounded overflow-x-auto">
+                                  {result.stderr}
+                                </pre>
+                              </div>
+                            )}
+                            {result.executionTime && (
+                              <div className="flex items-center text-sm text-gray-400">
+                                <Clock className="h-4 w-4 mr-1" />
+                                Execution Time: {result.executionTime}ms
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -670,25 +740,37 @@ int main() {
                 ) : (
                   submissionHistory.map((submission, index) => (
                     <div key={index} className="bg-gray-900 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center space-x-3">
                           <span
-                            className={`px-2 py-1 text-xs rounded-full ${
+                            className={`px-3 py-1 text-sm rounded-full font-medium ${
                               submission.status === "Accepted"
-                                ? "bg-green-900/20 text-green-400"
-                                : "bg-red-900/20 text-red-400"
+                                ? "bg-green-900/20 text-green-400 border border-green-700"
+                                : "bg-red-900/20 text-red-400 border border-red-700"
                             }`}
                           >
                             {submission.status}
                           </span>
-                          <span className="text-sm text-gray-400">{submission.language}</span>
+                          <span className="text-sm text-gray-400 bg-gray-800 px-2 py-1 rounded">
+                            {submission.language}
+                          </span>
                         </div>
                         <span className="text-sm text-gray-400">
                           {new Date(submission.submittedAt).toLocaleString()}
                         </span>
                       </div>
-                      {submission.executionTime && (
-                        <div className="text-sm text-gray-400">Runtime: {submission.executionTime}ms</div>
+
+                      {submission.performance && (
+                        <div className="grid grid-cols-2 gap-4 mt-3">
+                          <div className="text-sm">
+                            <span className="text-gray-400">Runtime: </span>
+                            <span className="text-white font-medium">{submission.performance.runtime}</span>
+                          </div>
+                          <div className="text-sm">
+                            <span className="text-gray-400">Memory: </span>
+                            <span className="text-white font-medium">{submission.performance.memory}</span>
+                          </div>
+                        </div>
                       )}
                     </div>
                   ))
@@ -769,7 +851,7 @@ int main() {
                     <li>Your code will be tested against multiple test cases</li>
                     <li>Make sure your output format exactly matches the expected output</li>
                     <li>Click "Run" to test against the first example</li>
-                    <li>Click "Submit" to test against all test cases</li>
+                    <li>Click "Submit" to test against all test cases and save your submission</li>
                   </ul>
                 </div>
               </div>

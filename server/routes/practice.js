@@ -147,6 +147,40 @@ router.get("/problems/:id", async (req, res) => {
   }
 })
 
+// Get user's submissions for a specific problem
+router.get("/problems/:id/submissions", authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params
+    const user = await User.findById(req.user.id)
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      })
+    }
+
+    // Filter submissions for this specific problem
+    const problemSubmissions = user.submissions
+      ? user.submissions
+          .filter((sub) => sub.problemId.toString() === id)
+          .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))
+      : []
+
+    res.json({
+      success: true,
+      submissions: problemSubmissions,
+    })
+  } catch (error) {
+    console.error("Error fetching submissions:", error)
+    res.status(500).json({
+      success: false,
+      message: "Error fetching submissions",
+      error: error.message,
+    })
+  }
+})
+
 // Run code against a single test case (for testing)
 router.post("/problems/:id/run", authenticateToken, async (req, res) => {
   try {
@@ -225,8 +259,8 @@ router.post("/problems/:id/submit", authenticateToken, async (req, res) => {
       })
     }
 
-    // Evaluate code against all test cases
-    const evaluation = await evaluateCode(code, language, problem.testCases)
+    // Evaluate code against all test cases (but only show first 2 in results)
+    const evaluation = await evaluateCode(code, language, problem.testCases, false)
 
     if (!evaluation.success) {
       return res.status(400).json({
@@ -263,24 +297,34 @@ router.post("/problems/:id/submit", authenticateToken, async (req, res) => {
       }
     }
 
-    // Create submission record
+    // Create submission record with ALL test results
     const submission = {
       problemId: id,
       code,
       language,
       status: isCorrect ? "Accepted" : "Wrong Answer",
       submittedAt: new Date(),
-      testResults: evaluation.results.map((r) => ({
+      executionTime: evaluation.avgExecutionTime,
+      memoryUsed: evaluation.maxMemoryUsed,
+      testResults: evaluation.allResults.map((r) => ({
         input: r.input,
         expectedOutput: r.expectedOutput,
         actualOutput: r.actualOutput,
         passed: r.passed,
         executionTime: r.executionTime,
+        memoryUsed: r.memoryUsed,
+        error: r.error,
       })),
+      performance: evaluation.performance,
     }
 
     user.submissions.push(submission)
     user.statistics.totalSubmissions += 1
+
+    // Update problem submission count
+    await Problem.findByIdAndUpdate(id, {
+      $inc: { submissionCount: 1 },
+    })
 
     let trophiesEarned = 0
 
@@ -300,6 +344,8 @@ router.post("/problems/:id/submit", authenticateToken, async (req, res) => {
           language,
           code,
           trophiesEarned,
+          executionTime: evaluation.avgExecutionTime,
+          memoryUsed: evaluation.maxMemoryUsed,
         })
 
         // Add trophy history
@@ -344,11 +390,13 @@ router.post("/problems/:id/submit", authenticateToken, async (req, res) => {
     res.json({
       success: true,
       isCorrect,
-      results: evaluation.results,
+      results: evaluation.results, // Only first 2 test cases
+      hiddenTestSummary: evaluation.hiddenTestSummary,
+      performance: evaluation.performance,
       trophiesEarned,
       message: isCorrect
         ? `Congratulations! Solution accepted. ${trophiesEarned > 0 ? `You earned ${trophiesEarned} trophies!` : ""}`
-        : "Solution incorrect. Please try again.",
+        : `${evaluation.passedCount}/${evaluation.totalTestCases} test cases passed`,
     })
   } catch (error) {
     console.error("Error submitting solution:", error)
@@ -390,34 +438,5 @@ router.get("/stats", authenticateToken, async (req, res) => {
     })
   }
 })
-
-
-// Get user's submissions for a problem
-router.get("/problems/:id/submissions", authenticateToken, async (req, res) => {
-  try {
-    const problemId = req.params.id
-    const userId = req.user._id
-
-    const user = await User.findById(userId)
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" })
-    }
-
-    const submissions =
-      user.submissions && Array.isArray(user.submissions)
-        ? user.submissions
-            .filter((sub) => sub.problemId && sub.problemId.toString() === problemId)
-            .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))
-            .slice(0, 20) // Last 20 submissions
-        : []
-
-    res.json({ submissions })
-  } catch (error) {
-    console.error("Error fetching submissions:", error)
-    res.status(500).json({ message: "Server error", error: error.message })
-  }
-})
-
 
 module.exports = router

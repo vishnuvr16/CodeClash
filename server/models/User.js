@@ -28,6 +28,52 @@ const trophyHistorySchema = new mongoose.Schema({
   },
 })
 
+const submissionSchema = new mongoose.Schema({
+  problemId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Problem",
+    required: true,
+  },
+  code: {
+    type: String,
+    required: true,
+  },
+  language: {
+    type: String,
+    required: true,
+  },
+  status: {
+    type: String,
+    enum: ["Accepted", "Wrong Answer", "Time Limit Exceeded", "Runtime Error", "Compilation Error"],
+    required: true,
+  },
+  submittedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  executionTime: Number,
+  memoryUsed: Number,
+  testResults: [
+    {
+      input: String,
+      expectedOutput: String,
+      actualOutput: String,
+      passed: Boolean,
+      executionTime: Number,
+      memoryUsed: Number,
+      error: String,
+    },
+  ],
+  performance: {
+    timeComplexity: String,
+    spaceComplexity: String,
+    efficiency: Number,
+    runtime: String,
+    memory: String,
+    percentile: Number,
+  },
+})
+
 const userSchema = new mongoose.Schema(
   {
     username: {
@@ -98,32 +144,7 @@ const userSchema = new mongoose.Schema(
         trophiesEarned: Number,
       },
     ],
-    submissions: [
-      {
-        problemId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Problem",
-        },
-        code: String,
-        language: String,
-        status: String,
-        submittedAt: {
-          type: Date,
-          default: Date.now,
-        },
-        executionTime: Number,
-        memoryUsed: Number,
-        testResults: [
-          {
-            input: String,
-            expectedOutput: String,
-            actualOutput: String,
-            passed: Boolean,
-            executionTime: Number,
-          },
-        ],
-      },
-    ],
+    submissions: [submissionSchema],
     preferences: {
       theme: {
         type: String,

@@ -26,15 +26,15 @@ const STATUS_MAPPING = {
   14: "Exec Format Error",
 }
 
-// Simple code evaluation - user writes everything
-const evaluateCode = async (code, language, testCases) => {
+// Enhanced code evaluation - runs all test cases but only shows first 2
+const evaluateCode = async (code, language, testCases, showAllResults = false) => {
   try {
     console.log(`Evaluating ${language} code with ${testCases.length} test cases`)
 
     // If Judge0 is not available, use simulation
     if (!process.env.JUDGE0_API_KEY) {
       console.log("No Judge0 API key found, using simulation")
-      return simulateEvaluation(code, testCases)
+      return simulateEvaluation(code, testCases, showAllResults)
     }
 
     const languageId = LANGUAGE_IDS[language.toLowerCase()]
@@ -42,8 +42,8 @@ const evaluateCode = async (code, language, testCases) => {
       throw new Error(`Unsupported language: ${language}`)
     }
 
-    // Process each test case
-    const results = await Promise.all(
+    // Process all test cases in parallel
+    const allResults = await Promise.all(
       testCases.map(async (testCase, index) => {
         try {
           const startTime = Date.now()
@@ -74,10 +74,11 @@ const evaluateCode = async (code, language, testCases) => {
             passed,
             status: STATUS_MAPPING[result.status?.id] || "Unknown",
             statusId: result.status?.id,
-            executionTime: result.time ? Number.parseFloat(result.time) * 1000 : executionTime, // Convert to ms
+            executionTime: result.time ? Number.parseFloat(result.time) * 1000 : executionTime,
             memoryUsed: result.memory ? Number.parseInt(result.memory) : null,
             error: result.stderr || result.compile_output || null,
             exitCode: result.exit_code,
+            isHidden: index >= 2, // Mark test cases after first 2 as hidden
           }
         } catch (error) {
           console.error(`Error processing test case ${index + 1}:`, error)
@@ -95,21 +96,38 @@ const evaluateCode = async (code, language, testCases) => {
             memoryUsed: null,
             error: error.message,
             exitCode: null,
+            isHidden: index >= 2,
           }
         }
       }),
     )
 
-    // Calculate statistics
-    const passedCount = results.filter((result) => result.passed).length
+    // Calculate statistics from all results
+    const passedCount = allResults.filter((result) => result.passed).length
     const allPassed = passedCount === testCases.length
-    const totalExecutionTime = results.reduce((sum, result) => sum + (result.executionTime || 0), 0)
-    const maxMemoryUsed = Math.max(...results.map((result) => result.memoryUsed || 0))
-    const avgExecutionTime = totalExecutionTime / results.length
+    const totalExecutionTime = allResults.reduce((sum, result) => sum + (result.executionTime || 0), 0)
+    const maxMemoryUsed = Math.max(...allResults.map((result) => result.memoryUsed || 0))
+    const avgExecutionTime = totalExecutionTime / allResults.length
+
+    // For display, only show first 2 test cases unless showAllResults is true
+    const displayResults = showAllResults ? allResults : allResults.slice(0, 2)
+
+    // Add summary for hidden test cases if not showing all
+    let hiddenTestSummary = null
+    if (!showAllResults && allResults.length > 2) {
+      const hiddenResults = allResults.slice(2)
+      const hiddenPassed = hiddenResults.filter((r) => r.passed).length
+      hiddenTestSummary = {
+        total: hiddenResults.length,
+        passed: hiddenPassed,
+        failed: hiddenResults.length - hiddenPassed,
+      }
+    }
 
     return {
       success: true,
-      results,
+      results: displayResults,
+      allResults, // Keep all results for database storage
       allPassed,
       passedCount,
       totalTestCases: testCases.length,
@@ -117,10 +135,14 @@ const evaluateCode = async (code, language, testCases) => {
       avgExecutionTime: Number.parseFloat(avgExecutionTime.toFixed(3)),
       maxMemoryUsed,
       overallStatus: allPassed ? "Accepted" : "Failed",
+      hiddenTestSummary,
       performance: {
         timeComplexity: calculateTimeComplexity(avgExecutionTime),
         spaceComplexity: calculateSpaceComplexity(maxMemoryUsed),
         efficiency: calculateEfficiency(passedCount, testCases.length, avgExecutionTime),
+        runtime: `${avgExecutionTime.toFixed(0)}ms`,
+        memory: `${(maxMemoryUsed / 1024).toFixed(1)}MB`,
+        percentile: calculatePercentile(avgExecutionTime, maxMemoryUsed),
       },
     }
   } catch (error) {
@@ -136,7 +158,7 @@ const evaluateCode = async (code, language, testCases) => {
   }
 }
 
-// Simple code execution for single test case
+// Simple code execution for single test case (Run button)
 const runCode = async (code, language, testCase) => {
   try {
     console.log(`Running ${language} code`)
@@ -181,7 +203,7 @@ const runCode = async (code, language, testCase) => {
         passed,
         status: STATUS_MAPPING[result.status?.id] || "Unknown",
         statusId: result.status?.id,
-        executionTime: result.time ? Number.parseFloat(result.time) * 1000 : executionTime, // Convert to ms
+        executionTime: result.time ? Number.parseFloat(result.time) * 1000 : executionTime,
         memoryUsed: result.memory ? Number.parseInt(result.memory) : null,
         error: result.stderr || result.compile_output || null,
         exitCode: result.exit_code,
@@ -324,11 +346,18 @@ const calculateEfficiency = (passed, total, avgTime) => {
   return Math.round((accuracy + speed) / 2)
 }
 
+const calculatePercentile = (avgTime, maxMemory) => {
+  // Simulate percentile based on performance
+  const timeScore = avgTime < 50 ? 95 : avgTime < 200 ? 80 : avgTime < 1000 ? 60 : 30
+  const memoryScore = maxMemory < 5000 ? 95 : maxMemory < 20000 ? 80 : maxMemory < 50000 ? 60 : 30
+  return Math.round((timeScore + memoryScore) / 2)
+}
+
 // Simulation functions for when Judge0 is not available
-const simulateEvaluation = (code, testCases) => {
+const simulateEvaluation = (code, testCases, showAllResults = false) => {
   console.log("Using simulation mode for code evaluation")
 
-  const results = testCases.map((testCase, index) => {
+  const allResults = testCases.map((testCase, index) => {
     const hasLogic =
       code.length > 20 && (code.includes("print") || code.includes("console.log") || code.includes("System.out"))
     const passed = hasLogic && Math.random() > 0.3 // 70% pass rate for simulation
@@ -350,18 +379,35 @@ const simulateEvaluation = (code, testCases) => {
       memoryUsed,
       error: passed ? null : "Logic error",
       exitCode: passed ? 0 : 1,
+      isHidden: index >= 2,
     }
   })
 
-  const passedCount = results.filter((result) => result.passed).length
+  const passedCount = allResults.filter((result) => result.passed).length
   const allPassed = passedCount === testCases.length
-  const totalExecutionTime = results.reduce((sum, r) => sum + r.executionTime, 0)
-  const avgExecutionTime = totalExecutionTime / results.length
-  const maxMemoryUsed = Math.max(...results.map((r) => r.memoryUsed))
+  const totalExecutionTime = allResults.reduce((sum, r) => sum + r.executionTime, 0)
+  const avgExecutionTime = totalExecutionTime / allResults.length
+  const maxMemoryUsed = Math.max(...allResults.map((r) => r.memoryUsed))
+
+  // For display, only show first 2 test cases unless showAllResults is true
+  const displayResults = showAllResults ? allResults : allResults.slice(0, 2)
+
+  // Add summary for hidden test cases if not showing all
+  let hiddenTestSummary = null
+  if (!showAllResults && allResults.length > 2) {
+    const hiddenResults = allResults.slice(2)
+    const hiddenPassed = hiddenResults.filter((r) => r.passed).length
+    hiddenTestSummary = {
+      total: hiddenResults.length,
+      passed: hiddenPassed,
+      failed: hiddenResults.length - hiddenPassed,
+    }
+  }
 
   return {
     success: true,
-    results,
+    results: displayResults,
+    allResults,
     allPassed,
     passedCount,
     totalTestCases: testCases.length,
@@ -369,10 +415,14 @@ const simulateEvaluation = (code, testCases) => {
     avgExecutionTime: Number.parseFloat(avgExecutionTime.toFixed(3)),
     maxMemoryUsed,
     overallStatus: allPassed ? "Accepted" : "Failed",
+    hiddenTestSummary,
     performance: {
       timeComplexity: calculateTimeComplexity(avgExecutionTime),
       spaceComplexity: calculateSpaceComplexity(maxMemoryUsed),
       efficiency: calculateEfficiency(passedCount, testCases.length, avgExecutionTime),
+      runtime: `${avgExecutionTime.toFixed(0)}ms`,
+      memory: `${(maxMemoryUsed / 1024).toFixed(1)}MB`,
+      percentile: calculatePercentile(avgExecutionTime, maxMemoryUsed),
     },
   }
 }
