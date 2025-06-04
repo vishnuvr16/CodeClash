@@ -1,7 +1,7 @@
 const express = require("express")
 const Problem = require("../models/Problem")
 const User = require("../models/User")
-const {authenticateToken} = require("../middleware/auth")
+const { authenticateToken } = require("../middleware/auth")
 const { evaluateCode, runCode } = require("../utils/codeEvaluation")
 
 const router = express.Router()
@@ -80,6 +80,188 @@ router.get("/problems", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error fetching practice problems",
+      error: error.message,
+    })
+  }
+})
+
+// Submit solution for a practice problem - FIXED STATISTICS
+router.post("/problems/:id/submit", authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params
+    const { code, language } = req.body
+
+    if (!code || !language) {
+      return res.status(400).json({
+        success: false,
+        message: "Code and language are required",
+      })
+    }
+
+    // Find the problem
+    const problem = await Problem.findById(id)
+    if (!problem) {
+      return res.status(404).json({
+        success: false,
+        message: "Problem not found",
+      })
+    }
+
+    // Evaluate code against all test cases
+    const evaluation = await evaluateCode(code, language, problem.testCases, false)
+
+    if (!evaluation.success) {
+      return res.status(400).json({
+        success: false,
+        message: evaluation.error || "Code evaluation failed",
+      })
+    }
+
+    const isCorrect = evaluation.allPassed
+
+    // Update user record
+    const user = await User.findById(req.user.id)
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      })
+    }
+
+    // Initialize arrays and statistics if they don't exist
+    if (!user.submissions) user.submissions = []
+    if (!user.solvedProblems) user.solvedProblems = []
+    if (!user.statistics) {
+      user.statistics = {
+        totalSubmissions: 0,
+        acceptedSubmissions: 0,
+        easyProblemsSolved: 0,
+        mediumProblemsSolved: 0,
+        hardProblemsSolved: 0,
+        currentStreak: 0,
+        longestStreak: 0,
+        totalTrophiesEarned: 0,
+        totalTrophiesLost: 0,
+      }
+    }
+
+    // Create submission record with ALL test results
+    const submission = {
+      problemId: id,
+      code,
+      language,
+      status: isCorrect ? "Accepted" : "Wrong Answer",
+      submittedAt: new Date(),
+      executionTime: evaluation.avgExecutionTime,
+      memoryUsed: evaluation.maxMemoryUsed,
+      testResults: evaluation.allResults.map((r) => ({
+        input: r.input,
+        expectedOutput: r.expectedOutput,
+        actualOutput: r.actualOutput,
+        passed: r.passed,
+        executionTime: r.executionTime,
+        memoryUsed: r.memoryUsed,
+        error: r.error,
+      })),
+      performance: evaluation.performance,
+    }
+
+    user.submissions.push(submission)
+    user.statistics.totalSubmissions += 1
+
+    // Update problem submission count
+    await Problem.findByIdAndUpdate(id, {
+      $inc: { submissionCount: 1 },
+    })
+
+    let trophiesEarned = 0
+
+    if (isCorrect) {
+      user.statistics.acceptedSubmissions += 1
+
+      // Check if this is the first time solving this problem
+      const alreadySolved = user.solvedProblems.some((sp) => sp.problemId.toString() === id)
+
+      if (!alreadySolved) {
+        // Award trophies based on difficulty
+        trophiesEarned = TROPHY_REWARDS[problem.difficulty] || 0
+
+        user.solvedProblems.push({
+          problemId: id,
+          solvedAt: new Date(),
+          language,
+          code,
+          trophiesEarned,
+          executionTime: evaluation.avgExecutionTime,
+          memoryUsed: evaluation.maxMemoryUsed,
+        })
+
+        // Add trophy history
+        user.addTrophyHistory("earned", trophiesEarned, `Solved ${problem.difficulty} problem: ${problem.title}`, id)
+
+        // FIXED: Update difficulty-specific counters properly
+        if (problem.difficulty === "Easy") {
+          user.statistics.easyProblemsSolved = (user.statistics.easyProblemsSolved || 0) + 1
+        } else if (problem.difficulty === "Medium") {
+          user.statistics.mediumProblemsSolved = (user.statistics.mediumProblemsSolved || 0) + 1
+        } else if (problem.difficulty === "Hard") {
+          user.statistics.hardProblemsSolved = (user.statistics.hardProblemsSolved || 0) + 1
+        }
+
+        // FIXED: Update streak properly
+        const today = new Date()
+        today.setHours(0, 0, 0, 0) // Set to start of day for comparison
+
+        const lastSolved = user.statistics.lastSolvedDate
+
+        if (lastSolved) {
+          const lastSolvedDate = new Date(lastSolved)
+          lastSolvedDate.setHours(0, 0, 0, 0)
+
+          const daysDiff = Math.floor((today - lastSolvedDate) / (1000 * 60 * 60 * 24))
+
+          if (daysDiff === 0) {
+            // Same day, don't increment streak
+          } else if (daysDiff === 1) {
+            // Next day, increment streak
+            user.statistics.currentStreak = (user.statistics.currentStreak || 0) + 1
+          } else {
+            // Gap in days, reset streak
+            user.statistics.currentStreak = 1
+          }
+        } else {
+          // First problem solved
+          user.statistics.currentStreak = 1
+        }
+
+        user.statistics.longestStreak = Math.max(user.statistics.longestStreak || 0, user.statistics.currentStreak || 0)
+        user.statistics.lastSolvedDate = new Date()
+
+        // Increment problem's solved count
+        await Problem.findByIdAndUpdate(id, {
+          $inc: { solvedCount: 1 },
+        })
+      }
+    }
+
+    await user.save()
+
+    res.json({
+      success: true,
+      isCorrect,
+      results: evaluation.results, // Only first 2 test cases
+      hiddenTestSummary: evaluation.hiddenTestSummary,
+      performance: evaluation.performance,
+      trophiesEarned,
+      message: isCorrect
+        ? `Congratulations! Solution accepted. ${trophiesEarned > 0 ? `You earned ${trophiesEarned} trophies!` : ""}`
+        : `${evaluation.passedCount}/${evaluation.totalTestCases} test cases passed`,
+    })
+  } catch (error) {
+    console.error("Error submitting solution:", error)
+    res.status(500).json({
+      success: false,
+      message: "Error submitting solution",
       error: error.message,
     })
   }
@@ -232,177 +414,6 @@ router.post("/problems/:id/run", authenticateToken, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error running code",
-      error: error.message,
-    })
-  }
-})
-
-// Submit solution for a practice problem
-router.post("/problems/:id/submit", authenticateToken, async (req, res) => {
-  try {
-    const { id } = req.params
-    const { code, language } = req.body
-
-    if (!code || !language) {
-      return res.status(400).json({
-        success: false,
-        message: "Code and language are required",
-      })
-    }
-
-    // Find the problem
-    const problem = await Problem.findById(id)
-    if (!problem) {
-      return res.status(404).json({
-        success: false,
-        message: "Problem not found",
-      })
-    }
-
-    // Evaluate code against all test cases (but only show first 2 in results)
-    const evaluation = await evaluateCode(code, language, problem.testCases, false)
-
-    if (!evaluation.success) {
-      return res.status(400).json({
-        success: false,
-        message: evaluation.error || "Code evaluation failed",
-      })
-    }
-
-    const isCorrect = evaluation.allPassed
-
-    // Update user record
-    const user = await User.findById(req.user.id)
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      })
-    }
-
-    // Initialize arrays and statistics if they don't exist
-    if (!user.submissions) user.submissions = []
-    if (!user.solvedProblems) user.solvedProblems = []
-    if (!user.statistics) {
-      user.statistics = {
-        totalSubmissions: 0,
-        acceptedSubmissions: 0,
-        easyProblemsSolved: 0,
-        mediumProblemsSolved: 0,
-        hardProblemsSolved: 0,
-        currentStreak: 0,
-        longestStreak: 0,
-        totalTrophiesEarned: 0,
-        totalTrophiesLost: 0,
-      }
-    }
-
-    // Create submission record with ALL test results
-    const submission = {
-      problemId: id,
-      code,
-      language,
-      status: isCorrect ? "Accepted" : "Wrong Answer",
-      submittedAt: new Date(),
-      executionTime: evaluation.avgExecutionTime,
-      memoryUsed: evaluation.maxMemoryUsed,
-      testResults: evaluation.allResults.map((r) => ({
-        input: r.input,
-        expectedOutput: r.expectedOutput,
-        actualOutput: r.actualOutput,
-        passed: r.passed,
-        executionTime: r.executionTime,
-        memoryUsed: r.memoryUsed,
-        error: r.error,
-      })),
-      performance: evaluation.performance,
-    }
-
-    user.submissions.push(submission)
-    user.statistics.totalSubmissions += 1
-
-    // Update problem submission count
-    await Problem.findByIdAndUpdate(id, {
-      $inc: { submissionCount: 1 },
-    })
-
-    let trophiesEarned = 0
-
-    if (isCorrect) {
-      user.statistics.acceptedSubmissions += 1
-
-      // Check if this is the first time solving this problem
-      const alreadySolved = user.solvedProblems.some((sp) => sp.problemId.toString() === id)
-
-      if (!alreadySolved) {
-        // Award trophies based on difficulty
-        trophiesEarned = TROPHY_REWARDS[problem.difficulty] || 0
-
-        user.solvedProblems.push({
-          problemId: id,
-          solvedAt: new Date(),
-          language,
-          code,
-          trophiesEarned,
-          executionTime: evaluation.avgExecutionTime,
-          memoryUsed: evaluation.maxMemoryUsed,
-        })
-
-        // Add trophy history
-        user.addTrophyHistory("earned", trophiesEarned, `Solved ${problem.difficulty} problem: ${problem.title}`, id)
-
-        // Update difficulty-specific counters
-        if (problem.difficulty === "Easy") {
-          user.statistics.easyProblemsSolved += 1
-        } else if (problem.difficulty === "Medium") {
-          user.statistics.mediumProblemsSolved += 1
-        } else if (problem.difficulty === "Hard") {
-          user.statistics.hardProblemsSolved += 1
-        }
-
-        // Update streak
-        const today = new Date()
-        const lastSolved = user.statistics.lastSolvedDate
-
-        if (lastSolved) {
-          const daysDiff = Math.floor((today - lastSolved) / (1000 * 60 * 60 * 24))
-          if (daysDiff === 0 || daysDiff === 1) {
-            user.statistics.currentStreak += 1
-          } else if (daysDiff > 1) {
-            user.statistics.currentStreak = 1
-          }
-        } else {
-          user.statistics.currentStreak = 1
-        }
-
-        user.statistics.longestStreak = Math.max(user.statistics.longestStreak, user.statistics.currentStreak)
-        user.statistics.lastSolvedDate = today
-
-        // Increment problem's solved count
-        await Problem.findByIdAndUpdate(id, {
-          $inc: { solvedCount: 1 },
-        })
-      }
-    }
-
-    await user.save()
-
-    res.json({
-      success: true,
-      isCorrect,
-      results: evaluation.results, // Only first 2 test cases
-      hiddenTestSummary: evaluation.hiddenTestSummary,
-      performance: evaluation.performance,
-      trophiesEarned,
-      message: isCorrect
-        ? `Congratulations! Solution accepted. ${trophiesEarned > 0 ? `You earned ${trophiesEarned} trophies!` : ""}`
-        : `${evaluation.passedCount}/${evaluation.totalTestCases} test cases passed`,
-    })
-  } catch (error) {
-    console.error("Error submitting solution:", error)
-    res.status(500).json({
-      success: false,
-      message: "Error submitting solution",
       error: error.message,
     })
   }

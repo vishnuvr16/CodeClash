@@ -5,7 +5,7 @@ import { Link } from "react-router-dom"
 import { useAuth } from "../contexts/AuthContext"
 import Navbar from "../components/Navbar"
 import Footer from "../components/Footer"
-import { Clock, CheckCircle, XCircle } from "lucide-react"
+import { Clock, CheckCircle, XCircle, Trophy, Flag, AlertTriangle } from "lucide-react"
 import api from "../utils/api"
 
 const MatchHistoryPage = () => {
@@ -37,13 +37,19 @@ const MatchHistoryPage = () => {
           queryParams.append("result", filter)
         }
 
-        const response = await api.get(`/user/${currentUser._id}/recent-matches`)
-        setMatches(response.data.matches)
-        setPagination({
-          currentPage: Number.parseInt(response.data.currentPage),
-          totalPages: Number.parseInt(response.data.totalPages),
-          totalMatches: Number.parseInt(response.data.totalMatches),
-        })
+        const response = await api.get(`/match/user/history?${queryParams.toString()}`)
+
+        if (response.data && response.data.matches) {
+          setMatches(response.data.matches)
+          setPagination({
+            currentPage: Number.parseInt(response.data.currentPage) || 1,
+            totalPages: Number.parseInt(response.data.totalPages) || 1,
+            totalMatches: Number.parseInt(response.data.totalMatches) || 0,
+          })
+        } else {
+          console.error("Invalid match history response:", response.data)
+          setError("Invalid response format from server")
+        }
       } catch (error) {
         console.error("Error fetching match history:", error)
         setError("Failed to load match history. Please try again.")
@@ -76,6 +82,57 @@ const MatchHistoryPage = () => {
     return date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
   }
 
+  const getResultDetails = (match) => {
+    const isUserA = currentUser && match.userA && match.userA._id === currentUser._id
+    const isWinner = match.winner && match.winner._id === (currentUser ? currentUser._id : null)
+    const wasConceded = match.concedeBy && match.concedeBy._id
+    const userConceded = match.concedeBy && match.concedeBy._id === (currentUser ? currentUser._id : null)
+
+    if (wasConceded) {
+      if (userConceded) {
+        return {
+          result: "loss",
+          icon: <Flag className="h-5 w-5 mr-1" />,
+          label: "Conceded",
+          color: "text-orange-500",
+        }
+      } else {
+        return {
+          result: "win",
+          icon: <Flag className="h-5 w-5 mr-1" />,
+          label: "Opponent Conceded",
+          color: "text-green-500",
+        }
+      }
+    } else if (isWinner) {
+      return {
+        result: "win",
+        icon: <CheckCircle className="h-5 w-5 mr-1" />,
+        label: "Win",
+        color: "text-green-500",
+      }
+    } else if (match.winner) {
+      return {
+        result: "loss",
+        icon: <XCircle className="h-5 w-5 mr-1" />,
+        label: "Loss",
+        color: "text-red-500",
+      }
+    } else {
+      return {
+        result: "draw",
+        icon: <AlertTriangle className="h-5 w-5 mr-1" />,
+        label: "Draw",
+        color: "text-yellow-500",
+      }
+    }
+  }
+
+  const getRatingChange = (match) => {
+    const isUserA = currentUser && match.userA && match.userA._id === currentUser._id
+    return isUserA ? match.ratingChangeA : match.ratingChangeB
+  }
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <Navbar />
@@ -90,7 +147,7 @@ const MatchHistoryPage = () => {
             <p className="text-gray-400 mt-2">View your past duels and performance</p>
           </div>
 
-          <div className="mt-4 md:mt-0">
+          <div className="mt-4 md:mt-0 flex items-center space-x-4">
             <div className="flex flex-col sm:flex-row gap-4">
               <select
                 value={filter}
@@ -102,6 +159,14 @@ const MatchHistoryPage = () => {
                 <option value="losses">Losses Only</option>
               </select>
             </div>
+
+            <Link
+              to="/trophy-history"
+              className="inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-md transition-colors"
+            >
+              <Trophy className="h-5 w-5 mr-2" />
+              Trophy History
+            </Link>
           </div>
         </div>
 
@@ -166,66 +231,62 @@ const MatchHistoryPage = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-gray-800 divide-y divide-gray-700">
-                  {matches.map((match) => (
-                    <tr key={match.id} className="hover:bg-gray-700">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm">{formatDate(match.date)}</div>
-                        <div className="text-xs text-gray-400">{formatTime(match.date)}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-sm font-bold">
-                            {match.opponent.username.charAt(0).toUpperCase()}
+                  {matches.map((match) => {
+                    const resultDetails = getResultDetails(match)
+                    const ratingChange = getRatingChange(match)
+
+                    return (
+                      <tr key={match._id} className="hover:bg-gray-700">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm">{formatDate(match.createdAt || match.date)}</div>
+                          <div className="text-xs text-gray-400">{formatTime(match.createdAt || match.date)}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-sm font-bold">
+                              {match.opponent?.username?.charAt(0).toUpperCase() || "?"}
+                            </div>
+                            <div className="ml-3">
+                              <div className="text-sm font-medium">{match.opponent?.username || "Unknown"}</div>
+                              <div className="text-xs text-gray-400">Rating: {match.opponent?.rating || "N/A"}</div>
+                            </div>
                           </div>
-                          <div className="ml-3">
-                            <div className="text-sm font-medium">{match.opponent.username}</div>
-                            <div className="text-xs text-gray-400">Rating: {match.opponent.rating}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm">{match.problem?.title || "Unknown Problem"}</div>
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full ${
+                              match.problem?.difficulty === "Easy"
+                                ? "bg-green-900 bg-opacity-20 text-green-500"
+                                : match.problem?.difficulty === "Medium"
+                                  ? "bg-yellow-900 bg-opacity-20 text-yellow-500"
+                                  : "bg-red-900 bg-opacity-20 text-red-500"
+                            }`}
+                          >
+                            {match.problem?.difficulty || "Unknown"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className={`flex items-center ${resultDetails.color}`}>
+                            {resultDetails.icon}
+                            {resultDetails.label}
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm">{match.problem.title}</div>
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-full ${
-                            match.problem.difficulty === "Easy"
-                              ? "bg-green-900 bg-opacity-20 text-green-500"
-                              : match.problem.difficulty === "Medium"
-                                ? "bg-yellow-900 bg-opacity-20 text-yellow-500"
-                                : "bg-red-900 bg-opacity-20 text-red-500"
-                          }`}
-                        >
-                          {match.problem.difficulty}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {match.result === "win" ? (
-                          <div className="flex items-center text-green-500">
-                            <CheckCircle className="h-5 w-5 mr-1" />
-                            Win
-                          </div>
-                        ) : (
-                          <div className="flex items-center text-red-500">
-                            <XCircle className="h-5 w-5 mr-1" />
-                            Loss
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`text-sm font-medium ${
-                            match.ratingChange >= 0 ? "text-green-500" : "text-red-500"
-                          }`}
-                        >
-                          {match.ratingChange >= 0 ? `+${match.ratingChange}` : match.ratingChange}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Link to={`/result/${match.id}`} className="text-purple-400 hover:text-purple-300">
-                          View Details
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`text-sm font-medium ${ratingChange >= 0 ? "text-green-500" : "text-red-500"}`}
+                          >
+                            {ratingChange >= 0 ? `+${ratingChange}` : ratingChange}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Link to={`/result/${match._id}`} className="text-purple-400 hover:text-purple-300">
+                            View Details
+                          </Link>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -278,19 +339,24 @@ const MatchHistoryPage = () => {
               </div>
               <div className="bg-gray-700 rounded-lg p-6 text-center">
                 <div className="text-3xl font-bold text-green-500">
-                  {matches.filter((m) => m.result === "win").length}
+                  {matches.filter((m) => getResultDetails(m).result === "win").length}
                 </div>
                 <div className="text-sm text-gray-400">Wins</div>
               </div>
               <div className="bg-gray-700 rounded-lg p-6 text-center">
                 <div className="text-3xl font-bold text-red-500">
-                  {matches.filter((m) => m.result === "loss").length}
+                  {matches.filter((m) => getResultDetails(m).result === "loss").length}
                 </div>
                 <div className="text-sm text-gray-400">Losses</div>
               </div>
               <div className="bg-gray-700 rounded-lg p-6 text-center">
                 <div className="text-3xl font-bold text-purple-400">
-                  {Math.round((matches.filter((m) => m.result === "win").length / matches.length) * 100)}%
+                  {matches.length > 0
+                    ? Math.round(
+                        (matches.filter((m) => getResultDetails(m).result === "win").length / matches.length) * 100,
+                      )
+                    : 0}
+                  %
                 </div>
                 <div className="text-sm text-gray-400">Win Rate</div>
               </div>

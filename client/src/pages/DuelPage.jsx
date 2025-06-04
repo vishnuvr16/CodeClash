@@ -17,6 +17,8 @@ import {
   Trophy,
   Zap,
   CheckCircle,
+  ArrowLeft,
+  RefreshCw,
 } from "lucide-react"
 import api from "../utils/api"
 import { toast } from "react-toastify"
@@ -33,11 +35,12 @@ const DuelPage = () => {
   const [opponent, setOpponent] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [retryCount, setRetryCount] = useState(0)
 
   // Code editor state
   const [code, setCode] = useState("")
   const [language, setLanguage] = useState("javascript")
-  const [savedCodes, setSavedCodes] = useState({}) // Store code for each language
+  const [savedCodes, setSavedCodes] = useState({})
 
   // Match state
   const [timeLeft, setTimeLeft] = useState(1800)
@@ -53,12 +56,16 @@ const DuelPage = () => {
   const [myProgress, setMyProgress] = useState(0)
   const [opponentCode, setOpponentCode] = useState("")
   const [opponentLanguage, setOpponentLanguage] = useState("javascript")
-  const [opponentStatus, setOpponentStatus] = useState("coding") // coding, running, submitted
+  const [opponentStatus, setOpponentStatus] = useState("coding")
 
   // Chat state
   const [showChat, setShowChat] = useState(false)
   const [chatMessages, setChatMessages] = useState([])
   const [newMessage, setNewMessage] = useState("")
+
+  // Tab navigation prevention
+  const [hasLeftPage, setHasLeftPage] = useState(false)
+  const [showWarning, setShowWarning] = useState(false)
 
   // Refs
   const editorRef = useRef(null)
@@ -67,13 +74,75 @@ const DuelPage = () => {
   const timerIntervalRef = useRef(null)
   const codeUpdateTimerRef = useRef(null)
 
-  // Fetch match data
+  // Prevent tab navigation and page leave during active match
+  useEffect(() => {
+    if (matchStatus !== "active") return
+
+    const handleBeforeUnload = (e) => {
+      e.preventDefault()
+      e.returnValue = "Leaving this page will end your duel and count as a loss. Are you sure?"
+      return "Leaving this page will end your duel and count as a loss. Are you sure?"
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.hidden && matchStatus === "active" && !hasLeftPage) {
+        setHasLeftPage(true)
+        setShowWarning(true)
+
+        // Give user 10 seconds to return
+        setTimeout(() => {
+          if (document.hidden) {
+            handleDisconnection()
+          }
+        }, 10000)
+      }
+    }
+
+    const handleFocus = () => {
+      if (hasLeftPage && !document.hidden) {
+        setShowWarning(false)
+        setHasLeftPage(false)
+      }
+    }
+
+    // Add event listeners
+    window.addEventListener("beforeunload", handleBeforeUnload)
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    window.addEventListener("focus", handleFocus)
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload)
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+      window.removeEventListener("focus", handleFocus)
+    }
+  }, [matchStatus, hasLeftPage])
+
+  // Handle disconnection
+  const handleDisconnection = async () => {
+    try {
+      await api.post(`/matches/${matchId}/disconnect`)
+      toast.error("Match ended due to leaving the page")
+      navigate(`/result/${matchId}`)
+    } catch (error) {
+      console.error("Error handling disconnection:", error)
+      navigate("/dashboard")
+    }
+  }
+
+  // Fetch match data with retry logic and completion check
   const fetchMatchData = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
 
-      const response = await api.get(`/match/${matchId}`)
+      const response = await api.get(`/matches/${matchId}`)
+
+      // Check if match is completed (410 status)
+      if (response.status === 410 || response.data.redirectTo) {
+        navigate(response.data.redirectTo || `/result/${matchId}`)
+        return
+      }
+
       const matchData = response.data
 
       setMatch(matchData)
@@ -95,7 +164,6 @@ const DuelPage = () => {
         } else if (matchData.problem.starterCode && matchData.problem.starterCode[lang]) {
           savedCodesFromStorage[lang] = matchData.problem.starterCode[lang]
         } else {
-          // Default starter code
           savedCodesFromStorage[lang] = getDefaultStarterCode(lang)
         }
       })
@@ -113,12 +181,27 @@ const DuelPage = () => {
       }
 
       setLoading(false)
+      setRetryCount(0)
     } catch (error) {
       console.error("Error fetching match data:", error)
-      setError("Failed to load match data. Please try again.")
-      setLoading(false)
+
+      // Handle 410 Gone status (match completed)
+      if (error.response?.status === 410) {
+        navigate(error.response.data.redirectTo || `/result/${matchId}`)
+        return
+      }
+
+      if (retryCount < 3) {
+        setRetryCount((prev) => prev + 1)
+        setTimeout(() => {
+          fetchMatchData()
+        }, 2000)
+      } else {
+        setError("Failed to load match data. Please try again.")
+        setLoading(false)
+      }
     }
-  }, [matchId, currentUser, language])
+  }, [matchId, currentUser, language, retryCount, navigate])
 
   // Get default starter code for each language
   const getDefaultStarterCode = (lang) => {
@@ -156,24 +239,15 @@ const DuelPage = () => {
     (currentCode) => {
       if (!problem || !currentCode) return 0
 
-      // Simple progress calculation based on multiple factors
       const codeLength = currentCode.length
       const lineCount = currentCode.split("\n").length
       const hasFunction = /function|def|public/.test(currentCode)
       const hasLogic = /if|for|while|return/.test(currentCode)
 
       let progress = 0
-
-      // Base progress from code length (0-40%)
       progress += Math.min(40, (codeLength / 200) * 40)
-
-      // Progress from line count (0-20%)
       progress += Math.min(20, (lineCount / 10) * 20)
-
-      // Bonus for having function structure (0-20%)
       if (hasFunction) progress += 20
-
-      // Bonus for having logic (0-20%)
       if (hasLogic) progress += 20
 
       return Math.min(100, Math.round(progress))
@@ -181,9 +255,8 @@ const DuelPage = () => {
     [problem],
   )
 
-  // Handle language change without page reload
+  // Handle language change
   const handleLanguageChange = (newLanguage) => {
-    // Save current code
     const updatedCodes = {
       ...savedCodes,
       [language]: code,
@@ -191,7 +264,6 @@ const DuelPage = () => {
     setSavedCodes(updatedCodes)
     localStorage.setItem(`match_${matchId}_code_${language}`, code)
 
-    // Switch to new language
     setLanguage(newLanguage)
     setCode(updatedCodes[newLanguage] || getDefaultStarterCode(newLanguage))
   }
@@ -200,16 +272,13 @@ const DuelPage = () => {
   const handleCodeChange = (newCode) => {
     setCode(newCode)
 
-    // Update progress
     const progress = calculateProgress(newCode)
     setMyProgress(progress)
 
-    // Clear existing timer
     if (codeUpdateTimerRef.current) {
       clearTimeout(codeUpdateTimerRef.current)
     }
 
-    // Debounced code update to opponent
     codeUpdateTimerRef.current = setTimeout(() => {
       if (connected && matchId) {
         sendCodeUpdate(matchId, newCode, language)
@@ -223,7 +292,7 @@ const DuelPage = () => {
     if (connected && matchId && matchStatus === "active") {
       progressUpdateTimerRef.current = setInterval(() => {
         sendProgressUpdate(matchId, myProgress)
-      }, 3000) // Send every 3 seconds
+      }, 3000)
 
       return () => {
         if (progressUpdateTimerRef.current) {
@@ -347,14 +416,14 @@ const DuelPage = () => {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
   }
 
-  // Run code
+  // Run code with error handling
   const runCode = async () => {
     setIsRunning(true)
     setRunOutput("Running code...")
     setOpponentStatus("running")
 
     try {
-      const response = await api.post(`/match/${matchId}/run`, {
+      const response = await api.post(`/matches/${matchId}/run`, {
         code,
         language,
         testCaseIndex: 0,
@@ -366,31 +435,33 @@ const DuelPage = () => {
       setRunOutput(output)
     } catch (error) {
       console.error("Error running code:", error)
-      setRunOutput(`Error: ${error.response?.data?.message || "Unknown error"}`)
+      setRunOutput(
+        `Error: ${error.response?.data?.message || "Unknown error occurred while running your code. Please try again."}`,
+      )
     } finally {
       setIsRunning(false)
       setOpponentStatus("coding")
     }
   }
 
-  // Submit solution
+  // Submit solution with error handling
   const submitSolution = async () => {
     setIsSubmitting(true)
     setOpponentStatus("submitted")
 
     try {
-      const response = await api.post(`/match/${matchId}/submit`, {
+      const response = await api.post(`/matches/${matchId}/submit`, {
         code,
         language,
       })
 
-      const { isCorrect, match: updatedMatch } = response.data
+      const { isCorrect, redirectTo } = response.data
 
       if (isCorrect) {
         toast.success("Correct solution! You win!")
         setMatchStatus("completed")
         setTimeout(() => {
-          navigate(`/result/${matchId}`)
+          navigate(redirectTo || `/result/${matchId}`)
         }, 2000)
       } else {
         toast.error("Incorrect solution. Keep trying!")
@@ -399,24 +470,28 @@ const DuelPage = () => {
       }
     } catch (error) {
       console.error("Error submitting solution:", error)
-      toast.error(`Submission error: ${error.response?.data?.message || "Unknown error"}`)
+      toast.error(
+        `Submission error: ${error.response?.data?.message || "An error occurred while submitting your solution. Please try again."}`,
+      )
       setIsSubmitting(false)
       setOpponentStatus("coding")
     }
   }
 
-  // Concede match
+  // Concede match with error handling
   const concedeMatch = async () => {
     setIsConceding(true)
 
     try {
-      await api.post(`/match/${matchId}/concede`)
+      const response = await api.post(`/matches/${matchId}/concede`)
       toast.info("You have conceded the match")
       setMatchStatus("completed")
-      navigate(`/result/${matchId}`)
+      navigate(response.data.redirectTo || `/result/${matchId}`)
     } catch (error) {
       console.error("Error conceding match:", error)
-      toast.error(`Error: ${error.response?.data?.message || "Unknown error"}`)
+      toast.error(
+        `Error: ${error.response?.data?.message || "An error occurred while conceding the match. Please try again."}`,
+      )
       setIsConceding(false)
       setShowConcedeConfirm(false)
     }
@@ -436,6 +511,13 @@ const DuelPage = () => {
     }
   }, [chatMessages])
 
+  // Handle retry button click
+  const handleRetry = () => {
+    setRetryCount(0)
+    setError(null)
+    fetchMatchData()
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
@@ -454,12 +536,22 @@ const DuelPage = () => {
           <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold mb-4">Error</h2>
           <p className="text-gray-400 mb-6">{error}</p>
-          <button
-            onClick={() => navigate("/dashboard")}
-            className="px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-md font-medium transition-colors"
-          >
-            Return to Dashboard
-          </button>
+          <div className="flex flex-col sm:flex-row justify-center gap-4">
+            <button
+              onClick={handleRetry}
+              className="px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-md font-medium transition-colors flex items-center justify-center"
+            >
+              <RefreshCw className="h-5 w-5 mr-2" />
+              Retry
+            </button>
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="px-6 py-3 bg-gray-700 hover:bg-gray-600 rounded-md font-medium transition-colors flex items-center justify-center"
+            >
+              <ArrowLeft className="h-5 w-5 mr-2" />
+              Return to Dashboard
+            </button>
+          </div>
         </div>
       </div>
     )
@@ -467,6 +559,20 @@ const DuelPage = () => {
 
   return (
     <div className="h-screen bg-gray-900 text-white flex flex-col overflow-hidden">
+      {/* Tab Navigation Warning */}
+      {showWarning && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-red-600 rounded-lg shadow-xl p-6 max-w-md w-full text-center">
+            <AlertCircle className="h-16 w-16 text-white mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-white mb-4">Warning!</h3>
+            <p className="text-white mb-6">
+              You left the duel page! Return within 10 seconds or the match will end and count as a loss.
+            </p>
+            <p className="text-red-200 text-sm">Click on this tab to return to the match.</p>
+          </div>
+        </div>
+      )}
+
       {/* Enhanced Header */}
       <header className="bg-gray-800 border-b border-gray-700 py-3 px-6 flex-shrink-0">
         <div className="flex items-center justify-between">
@@ -737,7 +843,7 @@ const DuelPage = () => {
                   </div>
                   <div>
                     <div className="font-medium text-white">{opponent?.username}</div>
-                    <div className="text-sm text-gray-400">Rating: {opponent?.rating}</div>
+                    <div className="text-sm text-gray-400">Trophies: {opponent?.trophies}</div>
                   </div>
                 </div>
 
@@ -823,7 +929,7 @@ const DuelPage = () => {
               <h3 className="text-xl font-bold text-white">Concede Match</h3>
             </div>
             <p className="text-gray-300 mb-6">
-              Are you sure you want to concede this match? This will count as a loss and affect your rating.
+              Are you sure you want to concede this match? This will count as a loss and affect your trophies.
             </p>
             <div className="flex justify-end space-x-4">
               <button
@@ -858,4 +964,4 @@ const DuelPage = () => {
   )
 }
 
-export default DuelPage;
+export default DuelPage
