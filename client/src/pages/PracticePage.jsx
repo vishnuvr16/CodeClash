@@ -22,6 +22,7 @@ import {
   Award,
   BarChart3,
   Users,
+  Calendar,
 } from "lucide-react"
 import api from "../utils/api"
 import { toast } from "react-toastify"
@@ -49,7 +50,29 @@ const PracticePage = () => {
     easySolved: 0,
     mediumSolved: 0,
     hardSolved: 0,
+    currentStreak: 0,
+    longestStreak: 0,
   })
+
+  // Fetch user statistics
+  const fetchUserStats = async () => {
+    try {
+      const response = await api.get("/practice/stats")
+      if (response.data && response.data.success) {
+        const stats = response.data.stats
+        setUserStats({
+          totalSolved: stats.totalSolved || 0,
+          easySolved: stats.easy?.solved || 0,
+          mediumSolved: stats.medium?.solved || 0,
+          hardSolved: stats.hard?.solved || 0,
+          currentStreak: stats.currentStreak || 0,
+          longestStreak: stats.longestStreak || 0,
+        })
+      }
+    } catch (error) {
+      console.error("Error fetching user stats:", error)
+    }
+  }
 
   useEffect(() => {
     const fetchProblems = async () => {
@@ -78,32 +101,31 @@ const PracticePage = () => {
         }
 
         const response = await api.get(`/practice/problems?${queryParams.toString()}`)
-        setProblems(response.data.problems)
-        setPagination({
-          currentPage: Number.parseInt(response.data.currentPage),
-          totalPages: Number.parseInt(response.data.totalPages),
-          totalProblems: Number.parseInt(response.data.totalProblems),
-        })
+
+        if (response.data && response.data.success) {
+          setProblems(response.data.problems || [])
+          setPagination({
+            currentPage: Number.parseInt(response.data.pagination?.currentPage || 1),
+            totalPages: Number.parseInt(response.data.pagination?.totalPages || 1),
+            totalProblems: Number.parseInt(response.data.pagination?.totalProblems || 0),
+          })
+        }
 
         // Fetch available tags if not already loaded
         if (availableTags.length === 0) {
           try {
             const tagsResponse = await api.get("/practice/tags")
-            setAvailableTags(tagsResponse.data.tags)
+            if (tagsResponse.data && tagsResponse.data.success) {
+              setAvailableTags(tagsResponse.data.tags || [])
+            }
           } catch (error) {
             console.error("Error fetching tags:", error)
           }
         }
 
-        // Calculate user stats
+        // Fetch user statistics
         if (currentUser) {
-          const solvedProblems = response.data.problems.filter((p) => p.isSolved)
-          setUserStats({
-            totalSolved: solvedProblems.length,
-            easySolved: solvedProblems.filter((p) => p.difficulty === "Easy").length,
-            mediumSolved: solvedProblems.filter((p) => p.difficulty === "Medium").length,
-            hardSolved: solvedProblems.filter((p) => p.difficulty === "Hard").length,
-          })
+          await fetchUserStats()
         }
       } catch (error) {
         console.error("Error fetching problems:", error)
@@ -126,20 +148,111 @@ const PracticePage = () => {
     currentUser,
   ])
 
+  // Calendar-based streak display
+  const StreakCalendar = ({ currentStreak, longestStreak }) => {
+    const [calendarData, setCalendarData] = useState([])
+    const [isLoading, setIsLoading] = useState(true)
+
+    useEffect(() => {
+      const fetchStreakData = async () => {
+        try {
+          const response = await api.get("/practice/streak-calendar")
+          if (response.data && response.data.success) {
+            setCalendarData(response.data.calendarData)
+          }
+        } catch (error) {
+          console.error("Error fetching streak data:", error)
+        } finally {
+          setIsLoading(false)
+        }
+      }
+
+      if (currentUser) {
+        fetchStreakData()
+      }
+    }, [currentUser])
+
+    if (isLoading) {
+      return (
+        <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+          <div className="animate-pulse">
+            <div className="h-6 bg-gray-700 rounded w-1/3 mb-4"></div>
+            <div className="grid grid-cols-10 gap-1 mb-4">
+              {[...Array(30)].map((_, i) => (
+                <div key={i} className="w-6 h-6 bg-gray-700 rounded-sm"></div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    const getIntensityColor = (problemsSolved) => {
+      if (problemsSolved === 0) return "bg-gray-700 text-gray-500"
+      if (problemsSolved === 1) return "bg-green-800 text-white"
+      if (problemsSolved === 2) return "bg-green-600 text-white"
+      if (problemsSolved >= 3) return "bg-green-400 text-white"
+      return "bg-gray-700 text-gray-500"
+    }
+
+    return (
+      <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold flex items-center">
+            <Calendar className="h-5 w-5 text-green-400 mr-2" />
+            Coding Streak
+          </h3>
+          <div className="text-right">
+            <div className="text-2xl font-bold text-green-400">{currentStreak}</div>
+            <div className="text-xs text-gray-400">Current</div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-10 gap-1 mb-4">
+          {calendarData.map((day, index) => (
+            <div
+              key={index}
+              className={`w-6 h-6 rounded-sm flex items-center justify-center text-xs transition-all hover:scale-110 cursor-pointer ${
+                day.isToday
+                  ? "ring-2 ring-blue-400 " + getIntensityColor(day.problemsSolved)
+                  : getIntensityColor(day.problemsSolved)
+              }`}
+              title={`${day.fullDate}: ${day.problemsSolved} problems solved`}
+            >
+              {day.date}
+            </div>
+          ))}
+        </div>
+
+        <div className="flex justify-between items-center text-sm text-gray-400">
+          <span>Longest: {longestStreak} days</span>
+          <div className="flex items-center space-x-2">
+            <span>Less</span>
+            <div className="flex space-x-1">
+              <div className="w-3 h-3 bg-gray-700 rounded-sm"></div>
+              <div className="w-3 h-3 bg-green-800 rounded-sm"></div>
+              <div className="w-3 h-3 bg-green-600 rounded-sm"></div>
+              <div className="w-3 h-3 bg-green-400 rounded-sm"></div>
+            </div>
+            <span>More</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= pagination.totalPages) {
       setPagination((prev) => ({
         ...prev,
         currentPage: newPage,
       }))
-      // Scroll to top when changing page
       window.scrollTo(0, 0)
     }
   }
 
   const handleSearch = (e) => {
     e.preventDefault()
-    // Reset to first page when searching
     setPagination((prev) => ({
       ...prev,
       currentPage: 1,
@@ -148,14 +261,11 @@ const PracticePage = () => {
 
   const handleSortChange = (newSortBy) => {
     if (sortBy === newSortBy) {
-      // Toggle sort order if clicking the same column
       setSortOrder(sortOrder === "asc" ? "desc" : "asc")
     } else {
-      // Set new sort column and default to descending
       setSortBy(newSortBy)
       setSortOrder("desc")
     }
-    // Reset to first page
     setPagination((prev) => ({
       ...prev,
       currentPage: 1,
@@ -252,6 +362,13 @@ const PracticePage = () => {
               </div>
               <div className="text-red-200 text-sm">Hard Problems</div>
             </div>
+          </div>
+        )}
+
+        {/* Streak Calendar */}
+        {currentUser && (
+          <div className="mb-8">
+            <StreakCalendar currentStreak={userStats.currentStreak} longestStreak={userStats.longestStreak} />
           </div>
         )}
 
@@ -392,7 +509,7 @@ const PracticePage = () => {
                 >
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center">
-                      {problem.isSolved ? (
+                      {problem.solved ? (
                         <CheckCircle className="h-6 w-6 text-green-500 mr-2" />
                       ) : (
                         <Clock className="h-6 w-6 text-gray-400 mr-2" />

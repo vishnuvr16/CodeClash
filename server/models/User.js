@@ -233,7 +233,7 @@ userSchema.virtual("trophyTier").get(function () {
 })
 
 userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next()
+  if (!this.isModified("password") || !this.password) return next()
 
   try {
     const salt = await bcrypt.genSalt(10)

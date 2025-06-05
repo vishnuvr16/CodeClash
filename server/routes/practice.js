@@ -422,18 +422,60 @@ router.post("/problems/:id/run", authenticateToken, async (req, res) => {
 // Get user's practice statistics
 router.get("/stats", authenticateToken, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).populate("solvedProblems.problemId")
+    const userId = req.user._id
+
+    const user = await User.findById(userId)
+      .populate("solvedProblems.problemId", "title difficulty")
+      .select("solvedProblems statistics")
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      })
+    }
+
+    // Calculate statistics
+    const totalSolved = user.solvedProblems.length
+    const easyCount = user.statistics?.easyProblemsSolved || 0
+    const mediumCount = user.statistics?.mediumProblemsSolved || 0
+    const hardCount = user.statistics?.hardProblemsSolved || 0
+
+    // Get total problems count by difficulty
+    const [totalEasy, totalMedium, totalHard] = await Promise.all([
+      Problem.countDocuments({ difficulty: "Easy" }),
+      Problem.countDocuments({ difficulty: "Medium" }),
+      Problem.countDocuments({ difficulty: "Hard" }),
+    ])
 
     const stats = {
-      totalSolved: user.solvedProblems.length,
-      easySolved: user.statistics.easyProblemsSolved || 0,
-      mediumSolved: user.statistics.mediumProblemsSolved || 0,
-      hardSolved: user.statistics.hardProblemsSolved || 0,
-      totalTrophies: user.trophies,
-      trophiesEarned: user.statistics.totalTrophiesEarned || 0,
-      currentStreak: user.statistics.currentStreak || 0,
-      longestStreak: user.statistics.longestStreak || 0,
-      recentlySolved: user.solvedProblems.sort((a, b) => new Date(b.solvedAt) - new Date(a.solvedAt)).slice(0, 5),
+      totalSolved,
+      totalProblems: totalEasy + totalMedium + totalHard,
+      easy: {
+        solved: easyCount,
+        total: totalEasy,
+        percentage: totalEasy > 0 ? Math.round((easyCount / totalEasy) * 100) : 0,
+      },
+      medium: {
+        solved: mediumCount,
+        total: totalMedium,
+        percentage: totalMedium > 0 ? Math.round((mediumCount / totalMedium) * 100) : 0,
+      },
+      hard: {
+        solved: hardCount,
+        total: totalHard,
+        percentage: totalHard > 0 ? Math.round((hardCount / totalHard) * 100) : 0,
+      },
+      currentStreak: user.statistics?.currentStreak || 0,
+      longestStreak: user.statistics?.longestStreak || 0,
+      recentSolves: user.solvedProblems
+        .sort((a, b) => new Date(b.solvedAt) - new Date(a.solvedAt))
+        .slice(0, 5)
+        .map((solve) => ({
+          problem: solve.problemId,
+          solvedAt: solve.solvedAt,
+          language: solve.language,
+        })),
     }
 
     res.json({
@@ -444,7 +486,93 @@ router.get("/stats", authenticateToken, async (req, res) => {
     console.error("Error fetching practice stats:", error)
     res.status(500).json({
       success: false,
-      message: "Error fetching practice statistics",
+      message: "Error fetching practice stats",
+      error: error.message,
+    })
+  }
+})
+
+// Get user's streak calendar data
+router.get("/streak-calendar", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user._id
+    const user = await User.findById(userId).select("solvedProblems statistics")
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      })
+    }
+
+    // Get last 30 days of activity
+    const today = new Date()
+    const thirtyDaysAgo = new Date(today)
+    thirtyDaysAgo.setDate(today.getDate() - 29)
+
+    // Create a map of dates when user solved problems
+    const solvedDates = new Map()
+
+    user.solvedProblems.forEach((solve) => {
+      const solveDate = new Date(solve.solvedAt)
+      const dateKey = solveDate.toISOString().split("T")[0] // YYYY-MM-DD format
+
+      if (solveDate >= thirtyDaysAgo && solveDate <= today) {
+        if (!solvedDates.has(dateKey)) {
+          solvedDates.set(dateKey, 0)
+        }
+        solvedDates.set(dateKey, solvedDates.get(dateKey) + 1)
+      }
+    })
+
+    // Generate calendar data for last 30 days
+    const calendarData = []
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(today)
+      date.setDate(date.getDate() - i)
+      const dateKey = date.toISOString().split("T")[0]
+
+      calendarData.push({
+        date: date.getDate(),
+        fullDate: dateKey,
+        isActive: solvedDates.has(dateKey),
+        problemsSolved: solvedDates.get(dateKey) || 0,
+        isToday: i === 0,
+        dayOfWeek: date.getDay(),
+        month: date.getMonth(),
+      })
+    }
+
+    // Calculate current streak
+    let currentStreak = 0
+    const todayKey = today.toISOString().split("T")[0]
+
+    // Start from today and go backwards
+    for (let i = 0; i < 365; i++) {
+      // Check up to a year
+      const checkDate = new Date(today)
+      checkDate.setDate(today.getDate() - i)
+      const checkDateKey = checkDate.toISOString().split("T")[0]
+
+      if (solvedDates.has(checkDateKey)) {
+        currentStreak++
+      } else {
+        break
+      }
+    }
+
+    res.json({
+      success: true,
+      calendarData,
+      currentStreak,
+      longestStreak: user.statistics?.longestStreak || 0,
+      totalProblemsLast30Days: Array.from(solvedDates.values()).reduce((sum, count) => sum + count, 0),
+    })
+  } catch (error) {
+    console.error("Error fetching streak calendar:", error)
+    res.status(500).json({
+      success: false,
+      message: "Error fetching streak calendar",
       error: error.message,
     })
   }

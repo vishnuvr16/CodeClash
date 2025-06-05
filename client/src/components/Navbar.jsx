@@ -273,13 +273,13 @@ const Navbar = () => {
               ) : (
                 <div className="flex items-center space-x-3">
                   <Link
-                    to="/auth/login"
+                    to="/login"
                     className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors"
                   >
                     Login
                   </Link>
                   <Link
-                    to="/auth/register"
+                    to="/register"
                     className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
                   >
                     Sign Up
@@ -377,7 +377,7 @@ const Navbar = () => {
               ) : (
                 <div className="space-y-2 px-2">
                   <Link
-                    to="/auth/login"
+                    to="/login"
                     className="flex items-center justify-center px-4 py-3 text-base font-medium text-gray-300 hover:text-white hover:bg-gray-700 transition-colors rounded-lg"
                     onClick={() => setIsSidebarOpen(false)}
                   >
@@ -385,7 +385,7 @@ const Navbar = () => {
                     Sign In
                   </Link>
                   <Link
-                    to="/auth/register"
+                    to="/register"
                     className="flex items-center justify-center px-4 py-3 text-base font-medium bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white transition-all duration-200 rounded-lg"
                     onClick={() => setIsSidebarOpen(false)}
                   >

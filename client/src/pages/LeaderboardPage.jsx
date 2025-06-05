@@ -90,7 +90,7 @@ const LeaderboardPage = () => {
   )
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-gray-900 text-white">
       <Navbar />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -100,61 +100,59 @@ const LeaderboardPage = () => {
             <div className="bg-gradient-to-r from-amber-400 to-orange-500 p-3 rounded-full mr-4">
               <Trophy className="h-8 w-8 text-white" />
             </div>
-            <h1 className="text-4xl font-bold text-slate-900">Global Leaderboard</h1>
+            <h1 className="text-4xl font-bold text-white">Global Leaderboard</h1>
           </div>
-          <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+          <p className="text-lg text-gray-300 max-w-2xl mx-auto">
             Compete with developers worldwide and climb the ranks
           </p>
         </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 p-6">
             <div className="flex items-center">
               <div className="bg-blue-100 p-3 rounded-lg">
                 <Users className="h-6 w-6 text-blue-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-slate-600">Total Players</p>
-                <p className="text-2xl font-bold text-slate-900">{leaderboard.length}</p>
+                <p className="text-sm font-medium text-gray-300">Total Players</p>
+                <p className="text-2xl font-bold text-white">{leaderboard.length}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 p-6">
             <div className="flex items-center">
               <div className="bg-emerald-100 p-3 rounded-lg">
                 <TrendingUp className="h-6 w-6 text-emerald-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-slate-600">Active Today</p>
-                <p className="text-2xl font-bold text-slate-900">{Math.floor(leaderboard.length * 0.3)}</p>
+                <p className="text-sm font-medium text-gray-300">Active Today</p>
+                <p className="text-2xl font-bold text-white">{Math.floor(leaderboard.length * 0.3)}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 p-6">
             <div className="flex items-center">
               <div className="bg-purple-100 p-3 rounded-lg">
                 <Award className="h-6 w-6 text-purple-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-slate-600">Top Tier</p>
-                <p className="text-2xl font-bold text-slate-900">
-                  {leaderboard.filter((u) => u.trophies >= 2000).length}
-                </p>
+                <p className="text-sm font-medium text-gray-300">Top Tier</p>
+                <p className="text-2xl font-bold text-white">{leaderboard.filter((u) => u.trophies >= 2000).length}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 p-6">
             <div className="flex items-center">
               <div className="bg-amber-100 p-3 rounded-lg">
                 <Zap className="h-6 w-6 text-amber-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-slate-600">Avg Trophies</p>
-                <p className="text-2xl font-bold text-slate-900">
+                <p className="text-sm font-medium text-gray-300">Avg Trophies</p>
+                <p className="text-2xl font-bold text-white">
                   {Math.round(leaderboard.reduce((sum, u) => sum + (u.trophies || 0), 0) / leaderboard.length) || 0}
                 </p>
               </div>
@@ -200,11 +198,11 @@ const LeaderboardPage = () => {
         )}
 
         {/* Search and Controls */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
+        <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 p-6 mb-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <form onSubmit={handleSearch} className="relative flex-grow max-w-md">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-5 w-5 text-slate-400" />
+                <Search className="h-5 w-5 text-gray-400" />
               </div>
               <input
                 type="text"
@@ -228,7 +226,7 @@ const LeaderboardPage = () => {
         {/* Top 3 Podium - RESPONSIVE VERSION */}
         {!isLoading && filteredLeaderboard.length >= 3 && (
           <div className="mb-12">
-            <h2 className="text-2xl font-bold text-center mb-8 text-slate-900">🏆 Top Performers</h2>
+            <h2 className="text-2xl font-bold text-center mb-8 text-white">🏆 Top Performers</h2>
 
             {/* Mobile Podium (Cards) */}
             <div className="md:hidden space-y-4">
@@ -323,17 +321,17 @@ const LeaderboardPage = () => {
         )}
 
         {/* Leaderboard Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 overflow-hidden">
           {isLoading ? (
             <div className="p-8 text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mx-auto mb-4"></div>
-              <p className="text-slate-600">Loading leaderboard...</p>
+              <p className="text-gray-300">Loading leaderboard...</p>
             </div>
           ) : error ? (
             <div className="p-8 text-center">
               <Trophy className="h-16 w-16 text-slate-400 mx-auto mb-4" />
-              <h3 className="text-xl font-bold mb-2 text-slate-900">Error Loading Leaderboard</h3>
-              <p className="text-slate-600 mb-4">{error}</p>
+              <h3 className="text-xl font-bold mb-2 text-white">Error Loading Leaderboard</h3>
+              <p className="text-gray-300 mb-4">{error}</p>
               <button
                 onClick={fetchLeaderboard}
                 className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors"
@@ -346,19 +344,19 @@ const LeaderboardPage = () => {
               <table className="min-w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                       Rank
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                       Player
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                       Trophies
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                       Matches
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                       Win Rate
                     </th>
                   </tr>
@@ -387,9 +385,7 @@ const LeaderboardPage = () => {
                             <div>
                               <div className="flex items-center">
                                 <span
-                                  className={`text-lg font-medium ${
-                                    isCurrentUser ? "text-indigo-900" : "text-slate-900"
-                                  }`}
+                                  className={`text-lg font-medium ${isCurrentUser ? "text-indigo-900" : "text-white"}`}
                                 >
                                   {user.username}
                                 </span>
@@ -414,11 +410,11 @@ const LeaderboardPage = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-lg font-medium text-slate-900">{user.matchesPlayed || 0}</div>
+                          <div className="text-lg font-medium text-white">{user.matchesPlayed || 0}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
-                            <div className="text-lg font-semibold text-slate-900">{user.winRate || 0}%</div>
+                            <div className="text-lg font-semibold text-white">{user.winRate || 0}%</div>
                             <div className="ml-3 w-20 bg-slate-200 rounded-full h-2">
                               <div
                                 className="bg-emerald-500 h-2 rounded-full transition-all duration-300"
@@ -436,15 +432,15 @@ const LeaderboardPage = () => {
           ) : (
             <div className="p-8 text-center">
               <Trophy className="h-16 w-16 text-slate-400 mx-auto mb-4" />
-              <h3 className="text-xl font-bold mb-2 text-slate-900">No Players Found</h3>
-              <p className="text-slate-600">No players match your search criteria.</p>
+              <h3 className="text-xl font-bold mb-2 text-white">No Players Found</h3>
+              <p className="text-gray-300">No players match your search criteria.</p>
             </div>
           )}
         </div>
 
         {/* Trophy Tiers Info */}
-        <div className="mt-12 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <h3 className="text-xl font-bold mb-6 flex items-center text-slate-900">
+        <div className="mt-12 bg-gray-800 rounded-xl shadow-sm border border-gray-700 p-6">
+          <h3 className="text-xl font-bold mb-6 flex items-center text-white">
             <Star className="h-6 w-6 text-amber-500 mr-2" />
             Trophy Tiers
           </h3>
@@ -458,7 +454,7 @@ const LeaderboardPage = () => {
               { name: "Champion", min: 3000, max: 4999, icon: "🏆", color: "text-cyan-600", bg: "bg-cyan-50" },
               { name: "Legend", min: 5000, max: "∞", icon: "👑", color: "text-red-500", bg: "bg-red-50" },
             ].map((tier, index) => (
-              <div key={index} className={`text-center p-4 rounded-lg border border-slate-200 ${tier.bg}`}>
+              <div key={index} className={`text-center p-4 rounded-lg border border-gray-700 ${tier.bg}`}>
                 <div className="text-2xl mb-2">{tier.icon}</div>
                 <div className={`font-semibold ${tier.color}`}>{tier.name}</div>
                 <div className="text-xs text-slate-500 mt-1">
