@@ -57,7 +57,7 @@ const ProfilePage = () => {
       setIsLoading(true)
       try {
         // Fetch user profile
-        const profileResponse = await api.get("/users/profile")
+        const profileResponse = await api.get("/user/profile")
         if (profileResponse.data && profileResponse.data.success) {
           const user = profileResponse.data.user
           setProfileData({
@@ -90,7 +90,7 @@ const ProfilePage = () => {
         }
 
         // Fetch match history
-        const historyResponse = await api.get("/matches/history")
+        const historyResponse = await api.get("/match/history")
         if (historyResponse.data && historyResponse.data.success) {
           setMatchHistory(historyResponse.data.matches || [])
         }
@@ -155,7 +155,7 @@ const ProfilePage = () => {
         formData.append("profilePicture", imageFile)
       }
 
-      const response = await api.put("/users/profile", formData, {
+      const response = await api.put("/user/profile", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },

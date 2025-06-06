@@ -274,4 +274,24 @@ router.put("/change-password", authenticateToken, async (req, res) => {
   }
 })
 
+// Add username availability check route
+router.get("/check-username", async (req, res) => {
+  try {
+    const { username } = req.query
+
+    if (!username || username.length < 3) {
+      return res.json({ available: false })
+    }
+
+    const existingUser = await User.findOne({
+      username: { $regex: new RegExp(`^${username}$`, "i") },
+    })
+
+    res.json({ available: !existingUser })
+  } catch (error) {
+    console.error("Error checking username:", error)
+    res.status(500).json({ available: false })
+  }
+})
+
 module.exports = router

@@ -2,36 +2,6 @@ const express = require("express")
 const User = require("../models/User")
 const Match = require("../models/Match")
 const { authenticateToken } = require("../middleware/auth")
-// Add multer for file uploads at the top
-const multer = require("multer")
-const path = require("path")
-
-// Configure multer for profile picture uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/profiles/")
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9)
-    cb(null, "profile-" + uniqueSuffix + path.extname(file.originalname))
-  },
-})
-
-const upload = multer({
-  storage: storage,
-  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB limit
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif/
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase())
-    const mimetype = allowedTypes.test(file.mimetype)
-
-    if (mimetype && extname) {
-      return cb(null, true)
-    } else {
-      cb(new Error("Only image files are allowed"))
-    }
-  },
-})
 
 const router = express.Router()
 
@@ -390,7 +360,7 @@ router.put("/preferences", authenticateToken, async (req, res) => {
 })
 
 // Update the profile update route to handle file uploads
-router.put("/profile", authenticateToken, upload.single("profilePicture"), async (req, res) => {
+router.put("/profile", authenticateToken, async (req, res) => {
   try {
     const { username } = req.body
     const userId = req.user._id
@@ -418,11 +388,6 @@ router.put("/profile", authenticateToken, upload.single("profilePicture"), async
       }
 
       user.username = username
-    }
-
-    // Handle profile picture upload
-    if (req.file) {
-      user.profilePicture = `/uploads/profiles/${req.file.filename}`
     }
 
     await user.save()
