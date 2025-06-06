@@ -44,6 +44,7 @@ const Dashboard = () => {
   const [recentMatches, setRecentMatches] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [showOnboarding, setShowOnboarding] = useState(false)
 
   useEffect(() => {
     const fetchUserData = async () => {
