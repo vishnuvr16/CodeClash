@@ -23,6 +23,7 @@ import {
   BarChart3,
 } from "lucide-react"
 import api from "../utils/api"
+import OnboardingModal from "../components/OnBoardingModal"
 
 const getTrophyTier = (trophies) => {
   if (trophies >= 5000) return { name: "Legend", color: "text-red-400", icon: "👑" }
@@ -67,6 +68,15 @@ const Dashboard = () => {
 
     if (currentUser) {
       fetchUserData()
+    }
+  }, [currentUser])
+
+  useEffect(() => {
+    // Check if user has completed onboarding
+    const onboardingCompleted = localStorage.getItem("onboardingCompleted")
+    if (!onboardingCompleted && currentUser) {
+      // Show onboarding for new users
+      setShowOnboarding(true)
     }
   }, [currentUser])
 
@@ -463,6 +473,7 @@ const Dashboard = () => {
       </div>
 
       <Footer />
+      <OnboardingModal isOpen={showOnboarding} onClose={() => setShowOnboarding(false)} />
     </div>
   )
 }

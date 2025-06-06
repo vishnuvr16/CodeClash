@@ -342,7 +342,7 @@ const LeaderboardPage = () => {
           ) : filteredLeaderboard.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="min-w-full">
-                <thead className="bg-slate-50 border-b border-slate-200">
+                <thead className="bg-gray-700 border-b border-gray-600">
                   <tr>
                     <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                       Rank
@@ -361,7 +361,7 @@ const LeaderboardPage = () => {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200">
+                <tbody className="divide-y divide-gray-600">
                   {filteredLeaderboard.map((user, index) => {
                     const rank = index + 1
                     const trophyTier = getTrophyTier(user.trophies || 0)
@@ -370,8 +370,8 @@ const LeaderboardPage = () => {
                     return (
                       <tr
                         key={user._id}
-                        className={`hover:bg-slate-50 transition-colors ${
-                          isCurrentUser ? "bg-indigo-50 border-l-4 border-indigo-500" : ""
+                        className={`hover:bg-gray-800 transition-colors ${
+                          isCurrentUser ? "bg-gray-800-50 border-l-4 border-indigo-500" : ""
                         }`}
                       >
                         <td className="px-6 py-4 whitespace-nowrap">

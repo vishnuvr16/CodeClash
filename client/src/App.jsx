@@ -20,6 +20,7 @@ import TrophyHistoryPage from "./pages/TrophyHistoryPage"
 import MatchHistoryPage from "./pages/MatchHistoryPage"
 import SettingsPage from "./pages/SettingsPage"
 import NotFoundPage from "./pages/NotFoundPage"
+import ProfilePage from "./pages/ProfilePage"
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -51,6 +52,16 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+
+              <Route 
+                path="/profile"
+                element= {
+                  <ProtectedRoute>
+                    <ProfilePage />
+                  </ProtectedRoute>
+                }
+              />
+
               <Route
                 path="/matchmaking"
                 element={

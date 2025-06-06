@@ -5,11 +5,9 @@ import { Link, useNavigate, useLocation } from "react-router-dom"
 import { useAuth } from "../contexts/AuthContext"
 import {
   Menu,
-  X,
   ChevronDown,
   LogOut,
   User,
-  Settings,
   Trophy,
   Code,
   Home,
@@ -17,6 +15,8 @@ import {
   BarChart3,
   Clock,
   ChevronRight,
+  Wifi,
+  WifiOff,
 } from "lucide-react"
 
 const Navbar = () => {
@@ -24,6 +24,7 @@ const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isOnline, setIsOnline] = useState(navigator.onLine)
   const navigate = useNavigate()
   const location = useLocation()
   const profileRef = useRef(null)
@@ -37,6 +38,25 @@ const Navbar = () => {
     setIsMenuOpen(false)
     setIsSidebarOpen(false)
   }
+
+  // Check online status
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true)
+    }
+
+    const handleOffline = () => {
+      setIsOnline(false)
+    }
+
+    window.addEventListener("online", handleOnline)
+    window.addEventListener("offline", handleOffline)
+
+    return () => {
+      window.removeEventListener("online", handleOnline)
+      window.removeEventListener("offline", handleOffline)
+    }
+  }, [])
 
   // Close mobile menu when route changes
   useEffect(() => {
@@ -132,6 +152,7 @@ const Navbar = () => {
     { to: "/leaderboard", label: "Leaderboard", icon: BarChart3 },
     { to: "/match/history", label: "Match History", icon: Clock },
     { to: "/trophy-history", label: "Trophy History", icon: Trophy },
+    { to: "/profile", label: "My Profile", icon: User },
   ]
 
   return (
@@ -201,6 +222,21 @@ const Navbar = () => {
 
             {/* Desktop Auth Section */}
             <div className="hidden md:flex md:items-center md:space-x-4">
+              {/* Online/Offline Status */}
+              <div className="flex items-center mr-2">
+                {isOnline ? (
+                  <div className="flex items-center text-green-400 text-xs">
+                    <Wifi className="h-4 w-4 mr-1" />
+                    <span>Online</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center text-red-400 text-xs">
+                    <WifiOff className="h-4 w-4 mr-1" />
+                    <span>Offline</span>
+                  </div>
+                )}
+              </div>
+
               {isAuthenticated ? (
                 <div className="relative" ref={profileRef}>
                   <button
@@ -210,9 +246,17 @@ const Navbar = () => {
                     aria-haspopup="true"
                   >
                     <div className="h-8 w-8 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center mr-3">
-                      <span className="text-white font-medium text-sm">
-                        {currentUser?.username?.charAt(0).toUpperCase() || "U"}
-                      </span>
+                      {currentUser?.profilePicture ? (
+                        <img
+                          src={currentUser.profilePicture || "/placeholder.svg"}
+                          alt={currentUser.username}
+                          className="h-8 w-8 rounded-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-white font-medium text-sm">
+                          {currentUser?.username?.charAt(0).toUpperCase() || "U"}
+                        </span>
+                      )}
                     </div>
                     <div className="flex flex-col items-start">
                       <span className="text-gray-300 font-medium">{currentUser?.username}</span>
@@ -229,8 +273,8 @@ const Navbar = () => {
                         <p className="text-sm font-medium text-white truncate">{currentUser?.email}</p>
                       </div>
                       <Link
-                        to="/dashboard"
-                        className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center transition-colors"
+                        to="/profile"
+                        className="px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center transition-colors"
                         onClick={() => setIsProfileOpen(false)}
                       >
                         <User className="mr-3 h-4 w-4" />
@@ -238,7 +282,7 @@ const Navbar = () => {
                       </Link>
                       <Link
                         to="/practice"
-                        className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center transition-colors"
+                        className="px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center transition-colors"
                         onClick={() => setIsProfileOpen(false)}
                       >
                         <Code className="mr-3 h-4 w-4" />
@@ -246,19 +290,11 @@ const Navbar = () => {
                       </Link>
                       <Link
                         to="/trophy-history"
-                        className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center transition-colors"
+                        className="px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center transition-colors"
                         onClick={() => setIsProfileOpen(false)}
                       >
                         <Trophy className="mr-3 h-4 w-4" />
-                        History
-                      </Link>
-                      <Link
-                        to="/settings"
-                        className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center transition-colors"
-                        onClick={() => setIsProfileOpen(false)}
-                      >
-                        <Settings className="mr-3 h-4 w-4" />
-                        Settings
+                        Trophy History
                       </Link>
                       <button
                         onClick={handleLogout}
@@ -273,13 +309,13 @@ const Navbar = () => {
               ) : (
                 <div className="flex items-center space-x-3">
                   <Link
-                    to="/login"
+                    to="/auth/login"
                     className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors"
                   >
                     Login
                   </Link>
                   <Link
-                    to="/register"
+                    to="/auth/register"
                     className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
                   >
                     Sign Up
@@ -308,101 +344,69 @@ const Navbar = () => {
                 {isAuthenticated ? (
                   <>
                     <div className="h-10 w-10 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
-                      <span className="text-white font-medium text-lg">
-                        {currentUser?.username?.charAt(0).toUpperCase() || "U"}
-                      </span>
+                      {currentUser?.profilePicture ? (
+                        <img
+                          src={currentUser.profilePicture || "/placeholder.svg"}
+                          alt={currentUser.username}
+                          className="h-10 w-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-white font-medium text-lg">
+                          {currentUser?.username?.charAt(0).toUpperCase() || "U"}
+                        </span>
+                      )}
                     </div>
                     <div>
                       <div className="font-medium text-white">{currentUser?.username || "Guest"}</div>
-                      <div className="text-xs text-gray-400">Rating: {currentUser?.trophies || 1200}</div>
+                      <div className="text-xs text-gray-400 flex items-center">
+                        <span className="mr-2">Rating: {currentUser?.trophies || 1200}</span>
+                        {isOnline ? (
+                          <div className="flex items-center text-green-400">
+                            <Wifi className="h-3 w-3 mr-1" />
+                            <span>Online</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center text-red-400">
+                            <WifiOff className="h-3 w-3 mr-1" />
+                            <span>Offline</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </>
                 ) : (
-                  <div className="flex items-center space-x-2">
-                    <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-700 rounded-lg flex items-center justify-center">
-                      <Code className="h-5 w-5 text-white" />
-                    </div>
-                    <span className="text-lg font-bold text-white">
-                      Code<span className="text-purple-400">Clash</span>
-                    </span>
-                  </div>
+                  <div className="font-medium text-white">Guest</div>
                 )}
               </div>
-              <button
-                onClick={() => setIsSidebarOpen(false)}
-                className="p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-800"
-              >
-                <X className="h-5 w-5" />
-              </button>
             </div>
 
             {/* Sidebar Content */}
-            <div className="py-4 flex-1 overflow-y-auto">
-              {isAuthenticated ? (
-                <>
-                  {/* Navigation Links */}
-                  <div className="space-y-1 mb-6">
-                    {sidebarLinks.map((link) => (
-                      <NavLink key={link.to} to={link.to} icon={link.icon} sidebar>
-                        {link.label}
-                      </NavLink>
-                    ))}
-                  </div>
-
-                  {/* User Actions */}
-                  <div className="border-t border-gray-700 pt-4 space-y-1">
-                    <Link
-                      to="/settings"
-                      className="flex items-center justify-between px-4 py-3 text-base font-medium text-gray-300 hover:text-white hover:bg-gray-700 transition-colors rounded-lg mx-2"
-                      onClick={() => setIsSidebarOpen(false)}
-                    >
-                      <div className="flex items-center">
-                        <Settings className="mr-3 h-5 w-5" />
-                        Settings
-                      </div>
-                      <ChevronRight className="h-4 w-4 opacity-50" />
-                    </Link>
-                    <button
-                      onClick={handleLogout}
-                      className="w-full text-left flex items-center justify-between px-4 py-3 text-base font-medium text-gray-300 hover:text-white hover:bg-gray-700 transition-colors rounded-lg mx-2"
-                    >
-                      <div className="flex items-center">
-                        <LogOut className="mr-3 h-5 w-5" />
-                        Sign out
-                      </div>
-                      <ChevronRight className="h-4 w-4 opacity-50" />
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <div className="space-y-2 px-2">
-                  <Link
-                    to="/login"
-                    className="flex items-center justify-center px-4 py-3 text-base font-medium text-gray-300 hover:text-white hover:bg-gray-700 transition-colors rounded-lg"
-                    onClick={() => setIsSidebarOpen(false)}
+            <nav className="mt-4">
+              <div>
+                {sidebarLinks.map((link) => (
+                  <NavLink key={link.to} to={link.to} icon={link.icon} sidebar>
+                    {link.label}
+                  </NavLink>
+                ))}
+                {!isAuthenticated && (
+                  <NavLink to="/auth/login" icon={User} sidebar>
+                    Login
+                  </NavLink>
+                )}
+                {isAuthenticated && (
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center justify-between px-4 py-3 text-base font-medium transition-colors duration-200 rounded-lg mx-2 text-gray-300 hover:text-white hover:bg-gray-700 w-full"
                   >
-                    <User className="mr-3 h-5 w-5" />
-                    Sign In
-                  </Link>
-                  <Link
-                    to="/register"
-                    className="flex items-center justify-center px-4 py-3 text-base font-medium bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white transition-all duration-200 rounded-lg"
-                    onClick={() => setIsSidebarOpen(false)}
-                  >
-                    <User className="mr-3 h-5 w-5" />
-                    Sign Up
-                  </Link>
-                </div>
-              )}
-            </div>
-
-            {/* Sidebar Footer */}
-            <div className="border-t border-gray-700 p-4">
-              <div className="flex items-center justify-center text-sm text-gray-400">
-                <Code className="h-4 w-4 text-purple-400 mr-2" />
-                CodeClash v1.0
+                    <div className="flex items-center">
+                      <LogOut className="mr-3 h-5 w-5" />
+                      Sign Out
+                    </div>
+                    <ChevronRight className="h-4 w-4 opacity-50" />
+                  </button>
+                )}
               </div>
-            </div>
+            </nav>
           </div>
         </div>
       )}
