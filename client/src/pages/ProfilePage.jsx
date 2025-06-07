@@ -7,7 +7,7 @@ import Footer from "../components/Footer"
 import { User, Eye, EyeOff, Download, Save, Award, Clock, CheckCircle, XCircle, Camera } from "lucide-react"
 import { toast } from "react-toastify"
 import api from "../utils/api"
-import { jsPDF } from "jspdf"
+import jsPDF from "jspdf"
 import "jspdf-autotable"
 
 const ProfilePage = () => {
@@ -249,6 +249,7 @@ const ProfilePage = () => {
     setIsGeneratingPDF(true)
 
     try {
+        autoTable(jsPDF)
       // Create new PDF document
       const doc = new jsPDF()
 
