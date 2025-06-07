@@ -90,7 +90,7 @@ const ProfilePage = () => {
         }
 
         // Fetch match history
-        const historyResponse = await api.get("/match/history")
+        const historyResponse = await api.get("/match/user/history")
         if (historyResponse.data && historyResponse.data.success) {
           setMatchHistory(historyResponse.data.matches || [])
         }
