@@ -309,13 +309,13 @@ const Navbar = () => {
               ) : (
                 <div className="flex items-center space-x-3">
                   <Link
-                    to="/auth/login"
+                    to="/login"
                     className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors"
                   >
                     Login
                   </Link>
                   <Link
-                    to="/auth/register"
+                    to="/register"
                     className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
                   >
                     Sign Up
@@ -389,7 +389,7 @@ const Navbar = () => {
                   </NavLink>
                 ))}
                 {!isAuthenticated && (
-                  <NavLink to="/auth/login" icon={User} sidebar>
+                  <NavLink to="/login" icon={User} sidebar>
                     Login
                   </NavLink>
                 )}
