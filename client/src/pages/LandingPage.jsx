@@ -1,4 +1,3 @@
-"use client"
 import { useState, useEffect } from "react"
 import { Link } from "react-router-dom"
 import { useAuth } from "../contexts/AuthContext"
@@ -34,9 +33,9 @@ const LandingPage = () => {
   ]
 
   const stats = [
-    { value: "1000+", label: "Active Users" },
-    { value: "50+", label: "Algorithm Challenges" },
-    { value: "2500+", label: "Duels Completed" },
+    { value: "20+", label: "Active Users" },
+    { value: "30+", label: "Algorithm Challenges" },
+    { value: "200+", label: "Duels Completed" },
     { value: "98%", label: "User Satisfaction" }
   ]
 
@@ -49,7 +48,7 @@ const LandingPage = () => {
         if (prev >= 100) {
           return 0
         }
-        return prev + 1
+        return prev + 1 
       })
     }, 150)
     
@@ -136,18 +135,6 @@ const LandingPage = () => {
                 )}
               </div>
               
-              <div className="flex items-center gap-4 pt-4">
-                <div className="flex -space-x-2">
-                  {[...Array(4)].map((_, i) => (
-                    <div key={i} className="w-8 h-8 rounded-full border-2 border-gray-900 overflow-hidden">
-                      <img src={`/api/placeholder/80/80`} alt="User" className="w-full h-full object-cover" />
-                    </div>
-                  ))}
-                </div>
-                <div className="text-sm text-gray-300">
-                  <span className="font-semibold text-white">1,200+</span> coders joined this week
-                </div>
-              </div>
             </div>
 
             <div 

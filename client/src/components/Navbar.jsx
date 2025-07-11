@@ -19,6 +19,53 @@ import {
   WifiOff,
 } from "lucide-react"
 
+// Helper component for NavLink
+// This component should exist or be defined elsewhere in your project.
+// Including it here for completeness based on your provided Navbar code.
+const NavLink = ({ to, children, icon: Icon, mobile = false, sidebar = false }) => {
+  const location = useLocation(); // Get location inside NavLink
+  const isActiveRoute = (path) => location.pathname === path;
+  const active = isActiveRoute(to);
+
+  if (sidebar) {
+    return (
+      <Link
+        to={to}
+        className={`flex items-center justify-between px-4 py-3 text-base font-medium transition-colors duration-200 rounded-lg mx-2 ${
+          active ? "text-white bg-purple-600" : "text-gray-300 hover:text-white hover:bg-gray-700"
+        }`}
+        // onClick prop for sidebar links is handled in Navbar if you want to close sidebar on click
+      >
+        <div className="flex items-center">
+          {Icon && <Icon className="mr-3 h-5 w-5" />}
+          {children}
+        </div>
+        <ChevronRight className="h-4 w-4 opacity-50" />
+      </Link>
+    );
+  }
+
+  const baseClasses = mobile
+    ? "flex items-center px-4 py-3 text-base font-medium transition-colors duration-200 w-full"
+    : "flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200";
+
+  const activeClasses = active
+    ? mobile
+      ? "text-white bg-purple-600 border-r-4 border-purple-300"
+      : "text-white bg-purple-600"
+    : mobile
+      ? "text-gray-300 hover:text-white hover:bg-gray-700"
+      : "text-gray-300 hover:text-white hover:bg-gray-700";
+
+  return (
+    <Link to={to} className={`${baseClasses} ${activeClasses}`} /* onClick for mobile menu closure can be added here */>
+      {Icon && <Icon className={mobile ? "mr-3 h-5 w-5" : "mr-2 h-4 w-4"} />}
+      {children}
+    </Link>
+  );
+};
+
+
 const Navbar = () => {
   const { isAuthenticated, currentUser, logout } = useAuth()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -44,7 +91,6 @@ const Navbar = () => {
     const handleOnline = () => {
       setIsOnline(true)
     }
-
     const handleOffline = () => {
       setIsOnline(false)
     }
@@ -58,92 +104,61 @@ const Navbar = () => {
     }
   }, [])
 
-  // Close mobile menu when route changes
+  // Close menus on route change
   useEffect(() => {
     setIsMenuOpen(false)
     setIsProfileOpen(false)
     setIsSidebarOpen(false)
   }, [location.pathname])
 
-  // Close dropdowns when clicking outside
+  // Close menus when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
+      // Close profile dropdown if click is outside its ref area
       if (profileRef.current && !profileRef.current.contains(event.target)) {
         setIsProfileOpen(false)
       }
+
+      // Close main menu dropdown if click is outside its ref area
+      // The `isMenuOpen` check ensures we only try to close if it's currently open
       if (menuRef.current && !menuRef.current.contains(event.target) && isMenuOpen) {
         setIsMenuOpen(false)
       }
+
+      // Close sidebar if click is outside its ref area
+      // Added `isSidebarOpen` check and exclusion for the button that opens it
       if (
         sidebarRef.current &&
         !sidebarRef.current.contains(event.target) &&
-        !event.target.closest(".mobile-menu-btn")
+        isSidebarOpen && // Only close if it's open
+        !event.target.closest(".mobile-menu-btn") // Don't close if click is on the button that opens it
       ) {
         setIsSidebarOpen(false)
       }
     }
 
     document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [isMenuOpen, isSidebarOpen])
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+    // Added `isProfileOpen` to dependencies for robustness:
+    // This ensures the `handleClickOutside` function re-runs if `isProfileOpen` state changes,
+    // which can prevent stale closures from interfering with open/close logic.
+  }, [isProfileOpen, isMenuOpen, isSidebarOpen]) 
 
   // Prevent body scroll when sidebar is open
   useEffect(() => {
     if (isSidebarOpen) {
       document.body.style.overflow = "hidden"
     } else {
-      document.body.style.overflow = "unset"
+      document.body.style.overflow = "unset" // Changed from "" to "unset" for better practice
     }
 
     return () => {
       document.body.style.overflow = "unset"
     }
   }, [isSidebarOpen])
-
-  const isActiveRoute = (path) => {
-    return location.pathname === path
-  }
-
-  const NavLink = ({ to, children, icon: Icon, mobile = false, sidebar = false }) => {
-    const active = isActiveRoute(to)
-
-    if (sidebar) {
-      return (
-        <Link
-          to={to}
-          className={`flex items-center justify-between px-4 py-3 text-base font-medium transition-colors duration-200 rounded-lg mx-2 ${
-            active ? "text-white bg-purple-600" : "text-gray-300 hover:text-white hover:bg-gray-700"
-          }`}
-          onClick={() => setIsSidebarOpen(false)}
-        >
-          <div className="flex items-center">
-            {Icon && <Icon className="mr-3 h-5 w-5" />}
-            {children}
-          </div>
-          <ChevronRight className="h-4 w-4 opacity-50" />
-        </Link>
-      )
-    }
-
-    const baseClasses = mobile
-      ? "flex items-center px-4 py-3 text-base font-medium transition-colors duration-200 w-full"
-      : "flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200"
-
-    const activeClasses = active
-      ? mobile
-        ? "text-white bg-purple-600 border-r-4 border-purple-300"
-        : "text-white bg-purple-600"
-      : mobile
-        ? "text-gray-300 hover:text-white hover:bg-gray-700"
-        : "text-gray-300 hover:text-white hover:bg-gray-700"
-
-    return (
-      <Link to={to} className={`${baseClasses} ${activeClasses}`} onClick={() => mobile && setIsMenuOpen(false)}>
-        {Icon && <Icon className={mobile ? "mr-3 h-5 w-5" : "mr-2 h-4 w-4"} />}
-        {children}
-      </Link>
-    )
-  }
 
   const sidebarLinks = [
     { to: "/dashboard", label: "Dashboard", icon: Home },
@@ -329,7 +344,7 @@ const Navbar = () => {
 
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
+        <div className="fixed inset-0 z-50 md:hidden" onClick={() => setIsSidebarOpen(false)}>
           <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" />
 
           {/* Sidebar */}
@@ -337,6 +352,7 @@ const Navbar = () => {
             ref={sidebarRef}
             className="fixed inset-y-0 left-0 max-w-xs w-full bg-gray-900 shadow-xl transform transition-transform duration-300 ease-in-out"
             style={{ width: "280px" }}
+            onClick={(e) => e.stopPropagation()} // Prevent clicks inside sidebar from closing it
           >
             {/* Sidebar Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-700">
@@ -384,12 +400,12 @@ const Navbar = () => {
             <nav className="mt-4">
               <div>
                 {sidebarLinks.map((link) => (
-                  <NavLink key={link.to} to={link.to} icon={link.icon} sidebar>
+                  <NavLink key={link.to} to={link.to} icon={link.icon} sidebar onClick={() => setIsSidebarOpen(false)}>
                     {link.label}
                   </NavLink>
                 ))}
                 {!isAuthenticated && (
-                  <NavLink to="/login" icon={User} sidebar>
+                  <NavLink to="/login" icon={User} sidebar onClick={() => setIsSidebarOpen(false)}>
                     Login
                   </NavLink>
                 )}

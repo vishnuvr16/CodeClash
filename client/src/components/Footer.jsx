@@ -9,7 +9,7 @@ const Footer = () => {
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center">
               <span className="text-xl font-bold text-white">
-                CodeClash<span className="text-purple-400">&lt; / &gt;</span>
+                CodeClash<span className="text-purple-400">&lt;  &gt;</span>
               </span>
             </div>
             <p className="mt-4 text-gray-400 max-w-md">
@@ -46,8 +46,8 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link href="/practice" className="text-base text-gray-400 hover:text-white">
-                  Practice Problems
+                <Link to="/practice" className="text-base text-gray-400 hover:text-white">
+                  Practice Problem
                 </Link>
               </li>
               {/* <li>
