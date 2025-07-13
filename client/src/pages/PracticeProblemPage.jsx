@@ -561,7 +561,7 @@ int main() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {/* Performance Insights - LeetCode Style */}
+                    {/* Performance Insights*/}
                     {performance && (
                       <div className="bg-gradient-to-r from-green-900/20 to-blue-900/20 border border-green-700 rounded-lg p-6">
                         <h4 className="font-medium text-green-400 mb-4 flex items-center">
@@ -844,7 +844,7 @@ int main() {
               <div className="flex items-start">
                 <Info className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
                 <div>
-                  <p className="font-medium mb-1">HackerRank Style Instructions:</p>
+                  <p className="font-medium mb-1">Instructions:</p>
                   <ul className="list-disc list-inside space-y-1 ml-1">
                     <li>Write complete code that reads from stdin and writes to stdout</li>
                     <li>Use the provided template as a starting point</li>
