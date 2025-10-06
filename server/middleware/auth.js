@@ -20,7 +20,7 @@ const authLimiter = rateLimit({
 const authenticateToken = async (req, res, next) => {
   try {
 
-    const token = req.cookies?.authToken || localStorage.getItem("token") || req.header("Authorization")?.replace("Bearer ", "")
+    const token = req.cookies?.authToken || req.header("Authorization")?.replace("Bearer ", "")
 
     if (!token) {
       return res.status(401).json({

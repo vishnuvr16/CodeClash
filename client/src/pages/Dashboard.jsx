@@ -474,7 +474,7 @@ const Dashboard = () => {
       </div>
 
       <Footer />
-      <OnboardingModal isOpen={showOnboarding} onClose={() => setShowOnboarding(false)} />
+      {/* <OnboardingModal isOpen={showOnboarding} onClose={() => setShowOnboarding(false)} /> */}
     </div>
   )
 }

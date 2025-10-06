@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { useAuth } from "../../contexts/AuthContext"
 import Navbar from "../../components/Navbar"
@@ -15,8 +15,14 @@ const LoginPage = () => {
   const [googleLoading, setGoogleLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
-  const { login, loginWithGoogle } = useAuth()
+  const { login, isAuthenticated, loading, loginWithGoogle } = useAuth()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!loading && isAuthenticated) {
+      navigate("/dashboard", { replace: true })
+    }
+  }, [isAuthenticated, loading, navigate])
 
   const handleChange = (e) => {
     const { name,type, value, checked } = e.target
@@ -86,6 +92,7 @@ const LoginPage = () => {
 
     window.location.href = authUrl
   }
+
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">

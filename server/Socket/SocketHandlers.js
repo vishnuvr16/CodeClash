@@ -21,7 +21,22 @@ const setupSocketHandlers = (io) => {
   // Middleware for authentication
   io.use(async (socket, next) => {
     try {
-      const token = socket.handshake.auth.token
+      let token;
+      const cookieHeader = socket.request.headers.cookie;
+      // const token = socket.handshake.auth.token
+      if (cookieHeader) {
+        const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
+          const [name, value] = cookie.trim().split('=');
+          acc[name] = value;
+          return acc;
+        }, {});
+
+        token = cookies.authToken;
+      }
+
+      if (!token) {
+        token = socket.handshake.auth.token;
+      }
 
       if (!token) {
         // Allow connection without token, but user will be limited
@@ -29,7 +44,7 @@ const setupSocketHandlers = (io) => {
       }
 
       // Verify token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || "your_jwt_secret")
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || "jwt_secret")
       // Find user
       const user = await User.findById(decoded.id).select("-password")
 

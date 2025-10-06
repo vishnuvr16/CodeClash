@@ -162,7 +162,7 @@ const RegisterPage = () => {
         email: formData.email,
         password: formData.password,
       })
-      navigate("/login")
+      navigate("/dashboard")
     } catch (error) {
       console.error("Registration error:", error)
     } finally {

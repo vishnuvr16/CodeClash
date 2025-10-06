@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom"
-import { AuthProvider } from "./contexts/AuthContext"
+import { AuthProvider, useAuth } from "./contexts/AuthContext"
 import { SocketProvider } from "./contexts/SocketContext"
 import { ToastContainer } from "react-toastify"
 import "react-toastify/dist/ReactToastify.css"
@@ -25,8 +25,8 @@ import ProfilePage from "./pages/ProfilePage"
 // import ProtectedRoute from "./components/ProtectedRoute"
 
 const ProtectedRoute = ({ children }) => {
-  const token = localStorage.getItem("token")
-  if (!token) {
+  const { isAuthenticated } = useAuth()
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />
   }
   return children

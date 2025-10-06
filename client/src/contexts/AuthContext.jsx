@@ -10,15 +10,15 @@ export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [token, setToken] = useState(localStorage.getItem("token") || "")
+  // const [token, setToken] = useState("")
 
   // Check if user is authenticated on initial load
   useEffect(() => {
     const verifyToken = async () => {
-      if (!token) {
-        setLoading(false)
-        return
-      }
+      // if (!token) {
+      //   setLoading(false)
+      //   return
+      // }
 
       try {
         const response = await api.get("/auth/verify")
@@ -26,15 +26,15 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(true)
       } catch (error) {
         // console.error("Token verification failed:", error)
-        localStorage.removeItem("token")
-        setToken("")
+        // localStorage.removeItem("token")
+        // setToken("")
       } finally {
         setLoading(false)
       }
     }
 
     verifyToken()
-  }, [token])
+  }, [])
 
   // Register a new user
   const register = async (userData) => {
@@ -95,13 +95,24 @@ export const AuthProvider = ({ children }) => {
   }
 
   // Logout user
-  const logout = () => {
-    localStorage.removeItem("token")
-    setToken("")
-    setCurrentUser(null)
-    setIsAuthenticated(false)
-    toast.info("You have been logged out")
+  const logout = async () => {
+  try {
+    await api.post("/auth/logout");
+    // Clear frontend state
+    localStorage.removeItem("token");
+    setCurrentUser(null);
+    setIsAuthenticated(false);
+    toast.info("You have been logged out");
+
+  } catch (error) {
+    console.error('Logout error:', error);
+    // Even if backend call fails, clear frontend state
+    localStorage.removeItem("token");
+    setCurrentUser(null);
+    setIsAuthenticated(false);
+    toast.info("You have been logged out");
   }
+}
 
   // Update user profile
   const updateProfile = async (userData) => {

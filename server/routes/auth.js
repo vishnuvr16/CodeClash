@@ -18,13 +18,13 @@ const {
 const rateLimit = require("express-rate-limit")
 
 // Enhanced rate limiting for sensitive operations
-const strictAuthLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 3, // Only 3 attempts per 15 minutes
-  message: { error: "Too many attempts, please try again later" },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
+// const strictAuthLimiter = rateLimit({
+//   windowMs: 15 * 60 * 1000, // 15 minutes
+//   max: 3, // Only 3 attempts per 15 minutes
+//   message: { error: "Too many attempts, please try again later" },
+//   standardHeaders: true,
+//   legacyHeaders: false,
+// })
 
 // Input validation helpers
 const validateEmail = (email) => {
@@ -44,7 +44,7 @@ const validatePassword = (password) => {
 }
 
 // Register a new user with enhanced security
-router.post("/register", strictAuthLimiter, sanitizeInputs, validateOrigin, async (req, res) => {
+router.post("/register", sanitizeInputs, validateOrigin, async (req, res) => {
   try {
     // console.log("Registration attempt:", req.body)
     const { username, email, password } = req.body
@@ -118,6 +118,18 @@ router.post("/register", strictAuthLimiter, sanitizeInputs, validateOrigin, asyn
 
     // Save the user
     await newUser.save()
+
+    const token = generateSecureToken({ id: newUser._id }, "24h")
+
+    // Set secure HTTP-only cookie
+    const cookieMaxAge = 24 * 60 * 60 * 1000
+    res.cookie("authToken", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: cookieMaxAge,
+      path: "/",
+    })
 
     logSecurityEvent("USER_REGISTERED", req, { userId: newUser._id, username, email })
 
