@@ -1,5 +1,3 @@
-"use client"
-
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "../../contexts/AuthContext"
@@ -21,7 +19,6 @@ const GoogleCallback = () => {
           throw new Error("No authorization code found in the URL")
         }
 
-        // Exchange the code for tokens and user info
         await loginWithGoogleCode(code)
 
         // Redirect to the original page or dashboard

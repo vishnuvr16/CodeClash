@@ -1,5 +1,3 @@
-"use client"
-
 import { createContext, useContext, useEffect, useState } from "react"
 import { io } from "socket.io-client"
 import { useAuth } from "./AuthContext"
@@ -37,26 +35,26 @@ export const SocketProvider = ({ children }) => {
       })
 
       socketInstance.on("connect", () => {
-        console.log("Socket connected")
+        // console.log("Socket connected")
         setConnected(true)
       })
 
       socketInstance.on("disconnect", () => {
-        console.log("Socket disconnected")
+        // console.log("Socket disconnected")
         setConnected(false)
       })
 
       socketInstance.on("error", (error) => {
-        console.error("Socket error:", error)
+        // console.error("Socket error:", error)
         toast.error(`Socket error: ${error.message || "Unknown error"}`)
       })
 
       socketInstance.on("reconnect_attempt", (attemptNumber) => {
-        console.log(`Socket reconnection attempt ${attemptNumber}`)
+        // console.log(`Socket reconnection attempt ${attemptNumber}`)
       })
 
       socketInstance.on("reconnect_failed", () => {
-        console.log("Socket reconnection failed")
+        // console.log("Socket reconnection failed")
         toast.error("Failed to reconnect to the server. Please refresh the page.")
       })
 

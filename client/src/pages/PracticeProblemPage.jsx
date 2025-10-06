@@ -1,5 +1,3 @@
-"use client"
-
 import { useState, useEffect, useRef } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useAuth } from "../contexts/AuthContext"
@@ -177,10 +175,10 @@ int main() {
           const historyResponse = await api.get(`/practice/problems/${problemId}/submissions`)
           setSubmissionHistory(historyResponse.data.submissions || [])
         } catch (error) {
-          console.log("No submission history available")
+          // console.log("No submission history available")
         }
       } catch (error) {
-        console.error("Error fetching problem:", error)
+        // console.error("Error fetching problem:", error)
         toast.error("Failed to load problem")
         navigate("/practice")
       } finally {
@@ -275,13 +273,13 @@ int main() {
           const historyResponse = await api.get(`/practice/problems/${problemId}/submissions`)
           setSubmissionHistory(historyResponse.data.submissions || [])
         } catch (error) {
-          console.log("Could not refresh submission history")
+          // console.log("Could not refresh submission history")
         }
       } else {
         toast.error(response.data.message)
       }
     } catch (error) {
-      console.error("Error submitting code:", error)
+      // console.error("Error submitting code:", error)
       toast.error("Failed to submit solution")
     } finally {
       setIsSubmitting(false)
@@ -447,10 +445,10 @@ int main() {
       )}
 
       {/* Main Content */}
-      <div className="flex h-full" style={{ height: isFullscreen ? "calc(100vh - 120px)" : "calc(100vh - 120px)" }}>
+      <div className="flex h-full pb-3" style={{ height: isFullscreen ? "100vh" : "calc(100vh - 0px)" }}>
         {/* Left Panel - Problem Description */}
         <div
-          className="bg-gray-800 border-r border-gray-700 overflow-hidden flex flex-col"
+          className="bg-gray-800 pb-10 border-r border-gray-700 overflow-hidden flex flex-col"
           style={{ width: `${leftPanelWidth}%` }}
         >
           {/* Tabs */}
@@ -891,6 +889,7 @@ int main() {
           </div>
         </div>
       </div>
+
     </div>
   )
 }

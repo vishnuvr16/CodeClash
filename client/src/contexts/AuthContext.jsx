@@ -1,5 +1,3 @@
-"use client"
-
 import { createContext, useState, useContext, useEffect } from "react"
 import { toast } from "react-toastify"
 import api from "../utils/api"
@@ -27,7 +25,7 @@ export const AuthProvider = ({ children }) => {
         setCurrentUser(response.data.user)
         setIsAuthenticated(true)
       } catch (error) {
-        console.error("Token verification failed:", error)
+        // console.error("Token verification failed:", error)
         localStorage.removeItem("token")
         setToken("")
       } finally {

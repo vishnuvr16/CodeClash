@@ -8,6 +8,7 @@ const helmet = require("helmet")
 const mongoSanitize = require("express-mongo-sanitize")
 const xss = require("xss-clean")
 const rateLimit = require("express-rate-limit")
+const cookieParser = require("cookie-parser")
 
 require("dotenv").config()
 
@@ -53,6 +54,8 @@ const limiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 })
+
+app.use(cookieParser())
 app.use("/api/", limiter)
 
 // API routes
@@ -100,12 +103,7 @@ app.use((req, res) => {
 
 // Connect to MongoDB with enhanced options
 mongoose
-  .connect(process.env.MONGODB_URI || "mongodb://localhost:27017/peerprep_duel", {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-    serverSelectionTimeoutMS: 5000,
-    socketTimeoutMS: 45000,
-  })
+  .connect(process.env.MONGODB_URI || "mongodb://localhost:27017/peerprep_duel")
   .then(() => {
     console.log("Connected to MongoDB")
 

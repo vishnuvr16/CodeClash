@@ -30,7 +30,6 @@ const setupSocketHandlers = (io) => {
 
       // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET || "your_jwt_secret")
-
       // Find user
       const user = await User.findById(decoded.id).select("-password")
 
@@ -42,18 +41,18 @@ const setupSocketHandlers = (io) => {
       socket.user = user
       next()
     } catch (error) {
-      console.error("Socket authentication error:", error)
+      // console.error("Socket authentication error:", error)
       next(new Error("Authentication error"))
     }
   })
 
   io.on("connection", (socket) => {
-    console.log("User connected:", socket.id)
+    // console.log("User connected:", socket.id)
 
     // Join user's room for private messages
     if (socket.user) {
       socket.join(socket.user._id.toString())
-      console.log(`User ${socket.user.username} joined their room`)
+      // console.log(`User ${socket.user.username} joined their room`)
     }
 
     // Handle matchmaking based on trophies
@@ -79,7 +78,7 @@ const setupSocketHandlers = (io) => {
         joinedAt: new Date(),
       })
 
-      console.log(`User ${socket.user.username} joined matchmaking queue with ${socket.user.trophies} trophies`)
+      // console.log(`User ${socket.user.username} joined matchmaking queue with ${socket.user.trophies} trophies`)
       socket.emit("matchmaking_joined")
 
       // Try to find a match
@@ -98,7 +97,7 @@ const setupSocketHandlers = (io) => {
       // Remove user from queue
       matchmakingQueue = matchmakingQueue.filter((user) => user.id !== userId)
 
-      console.log(`User ${socket.user.username} left matchmaking queue`)
+      // console.log(`User ${socket.user.username} left matchmaking queue`)
       socket.emit("matchmaking_cancelled")
     })
 
@@ -132,7 +131,7 @@ const setupSocketHandlers = (io) => {
 
         // Join match room
         socket.join(matchId)
-        console.log(`User ${socket.user.username} joined match room ${matchId}`)
+        // console.log(`User ${socket.user.username} joined match room ${matchId}`)
 
         // Store socket in active matches
         if (!activeMatches.has(matchId)) {
@@ -169,7 +168,7 @@ const setupSocketHandlers = (io) => {
           })
         }
       } catch (error) {
-        console.error("Error joining match:", error)
+        // console.error("Error joining match:", error)
         socket.emit("error", { message: "Error joining match" })
       }
     })
@@ -352,14 +351,14 @@ const setupSocketHandlers = (io) => {
           winner: winnerId,
         })
       } catch (error) {
-        console.error("Error handling concede:", error)
+        // console.error("Error handling concede:", error)
         socket.emit("error", { message: "Error processing concede" })
       }
     })
 
     // Handle disconnection
     socket.on("disconnect", () => {
-      console.log("User disconnected:", socket.id)
+      // console.log("User disconnected:", socket.id)
 
       if (!socket.user) return
 
@@ -410,7 +409,7 @@ const setupSocketHandlers = (io) => {
     // Only match if trophy difference is reasonable (within 200 trophies)
     const trophyDifference = Math.abs(opponent.trophies - userInQueue.trophies)
     if (trophyDifference > 200) {
-      console.log(`No suitable opponent found for ${socket.user.username} (trophy difference too large)`)
+      // console.log(`No suitable opponent found for ${socket.user.username} (trophy difference too large)`)
       return
     }
 
@@ -466,11 +465,11 @@ const setupSocketHandlers = (io) => {
         },
       })
 
-      console.log(
-        `Match created between ${socket.user.username} (${socket.user.trophies} trophies) and ${opponentUser.username} (${opponentUser.trophies} trophies)`,
-      )
+      // console.log(
+      //   `Match created between ${socket.user.username} (${socket.user.trophies} trophies) and ${opponentUser.username} (${opponentUser.trophies} trophies)`,
+      // )
     } catch (error) {
-      console.error("Error creating match:", error)
+      // console.error("Error creating match:", error)
 
       // Put users back in queue
       matchmakingQueue.push(userInQueue, opponent)

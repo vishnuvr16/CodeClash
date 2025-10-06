@@ -35,7 +35,7 @@ const LandingPage = () => {
   const stats = [
     { value: "20+", label: "Active Users" },
     { value: "30+", label: "Algorithm Challenges" },
-    { value: "200+", label: "Duels Completed" },
+    { value: "10+", label: "Duels Completed" },
     { value: "98%", label: "User Satisfaction" }
   ]
 
@@ -83,8 +83,6 @@ const LandingPage = () => {
 
       {/* Hero Section with Animation */}
       <section className="relative py-24 px-4 sm:px-6 lg:px-8 overflow-hidden min-h-[90vh] flex items-center">
-
-
         <div className="max-w-7xl mx-auto relative z-10 w-full">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div 
@@ -134,6 +132,7 @@ const LandingPage = () => {
                   </>
                 )}
               </div>
+              
               
             </div>
 
@@ -342,7 +341,7 @@ const LandingPage = () => {
       </section>
 
       {/* Testimonials Section - NEW */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-800 relative overflow-hidden">
+      {/* <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-800 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-gray-900 to-transparent opacity-50"></div>
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-16">
@@ -409,7 +408,7 @@ const LandingPage = () => {
             </div>
           </div>
         </div>
-      </section>
+      </section> */}
 
       {/* Features Grid - NEW */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-900">

@@ -1,5 +1,3 @@
-"use client"
-
 import { useState, useEffect, useRef } from "react"
 import { Link, useNavigate, useLocation } from "react-router-dom"
 import { useAuth } from "../contexts/AuthContext"
@@ -160,6 +158,60 @@ const Navbar = () => {
     }
   }, [isSidebarOpen])
 
+  const isActiveRoute = (path) => {
+    return location.pathname === path
+  }
+
+  // Fix: Create a separate click handler for sidebar links
+  const handleSidebarLinkClick = () => {
+    setIsSidebarOpen(false)
+  }
+
+  const NavLink = ({ to, children, icon: Icon, mobile = false, sidebar = false }) => {
+    const active = isActiveRoute(to)
+
+    if (sidebar) {
+      return (
+        <Link
+          to={to}
+          className={`flex items-center justify-between px-4 py-3 text-base font-medium transition-colors duration-200 rounded-lg mx-2 ${
+            active ? "text-white bg-purple-600" : "text-gray-300 hover:text-white hover:bg-gray-700"
+          }`}
+          onClick={handleSidebarLinkClick} // Use the separate handler
+        >
+          <div className="flex items-center">
+            {Icon && <Icon className="mr-3 h-5 w-5" />}
+            {children}
+          </div>
+          <ChevronRight className="h-4 w-4 opacity-50" />
+        </Link>
+      )
+    }
+
+    const baseClasses = mobile
+      ? "flex items-center px-4 py-3 text-base font-medium transition-colors duration-200 w-full"
+      : "flex items-center px-3 py-2 rounded-md text-sm font-medium "
+
+    const activeClasses = active
+      ? mobile
+        ? "text-white bg-purple-600 border-r-4 border-purple-300"
+        : "text-white bg-purple-600"
+      : mobile
+        ? "text-gray-300 hover:text-white hover:bg-gray-700"
+        : "text-gray-300 hover:text-white hover:bg-gray-700"
+
+    return (
+      <Link 
+        to={to} 
+        className={`${baseClasses} ${activeClasses}`} 
+        onClick={() => mobile && setIsMenuOpen(false)}
+      >
+        {Icon && <Icon className={mobile ? "mr-3 h-5 w-5" : "mr-2 h-4 w-4"} />}
+        {children}
+      </Link>
+    )
+  }
+
   const sidebarLinks = [
     { to: "/dashboard", label: "Dashboard", icon: Home },
     { to: "/practice", label: "Practice", icon: BookOpen },
@@ -256,17 +308,18 @@ const Navbar = () => {
                 <div className="relative" ref={profileRef}>
                   <button
                     onClick={() => setIsProfileOpen(!isProfileOpen)}
-                    className="flex items-center max-w-xs text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white transition-all duration-200 hover:bg-gray-800 px-3 py-2"
+                    className="flex items-center max-w-xs text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white transition-all duration-200 hover:bg-gray-800 px-3 py-1"
                     aria-expanded={isProfileOpen}
                     aria-haspopup="true"
                   >
                     <div className="h-8 w-8 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center mr-3">
                       {currentUser?.profilePicture ? (
                         <img
-                          src={currentUser.profilePicture || "/placeholder.svg"}
+                          src={currentUser.profilePicture}
                           alt={currentUser.username}
                           className="h-8 w-8 rounded-full object-cover"
                         />
+                        
                       ) : (
                         <span className="text-white font-medium text-sm">
                           {currentUser?.username?.charAt(0).toUpperCase() || "U"}
@@ -275,7 +328,7 @@ const Navbar = () => {
                     </div>
                     <div className="flex flex-col items-start">
                       <span className="text-gray-300 font-medium">{currentUser?.username}</span>
-                      <span className="text-xs text-gray-500">Rating: {currentUser?.trophies || 1200}</span>
+                      <span className="text-xs text-gray-500">Trophies: {currentUser?.trophies || 1200}</span>
                     </div>
                     <ChevronDown className="ml-2 h-4 w-4 text-gray-400" />
                   </button>

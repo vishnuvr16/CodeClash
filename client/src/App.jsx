@@ -22,7 +22,8 @@ import SettingsPage from "./pages/SettingsPage"
 import NotFoundPage from "./pages/NotFoundPage"
 import ProfilePage from "./pages/ProfilePage"
 
-// Protected Route Component
+// import ProtectedRoute from "./components/ProtectedRoute"
+
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem("token")
   if (!token) {
@@ -30,6 +31,7 @@ const ProtectedRoute = ({ children }) => {
   }
   return children
 }
+
 function App() {
   return (
     <AuthProvider>

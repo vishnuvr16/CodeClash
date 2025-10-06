@@ -1,5 +1,3 @@
-"use client"
-
 import { useState, useEffect, useRef } from "react"
 import { useAuth } from "../contexts/AuthContext"
 import Navbar from "../components/Navbar"
@@ -149,15 +147,14 @@ const ProfilePage = () => {
       // Create form data for multipart/form-data
       const formData = new FormData()
       formData.append("username", profileData.username)
-
       // Only append image if a new one was selected
       if (imageFile) {
-        formData.append("profilePicture", imageFile)
+        formData.append("profilePicture", imageFile,imageFile.name)
       }
 
       const response = await api.put("/user/profile", formData, {
         headers: {
-          "Content-Type": "multipart/form-data",
+          // "Content-Type": "multipart/form-data",
         },
       })
 
@@ -170,7 +167,6 @@ const ProfilePage = () => {
         setImageFile(null)
       }
     } catch (error) {
-      console.error("Profile update error:", error)
       toast.error(error.response?.data?.message || "Failed to update profile")
     } finally {
       setIsSaving(false)
@@ -442,9 +438,9 @@ const ProfilePage = () => {
                     <div className="flex flex-col items-center mb-6">
                       <div className="relative">
                         <div className="w-32 h-32 rounded-full overflow-hidden bg-gray-700 border-2 border-purple-500">
-                          {previewImage ? (
+                          {profileData.profilePicture || previewImage ? (
                             <img
-                              src={previewImage || "/placeholder.svg"}
+                              src={previewImage || profileData.profilePicture || "/placeholder.svg"}
                               alt="Profile"
                               className="w-full h-full object-cover"
                             />

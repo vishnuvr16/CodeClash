@@ -1,5 +1,3 @@
-"use client"
-
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { useSocket } from "../contexts/SocketContext"
@@ -48,18 +46,17 @@ const MatchmakingPage = () => {
 
     // Listen for matchmaking joined confirmation
     const handleMatchmakingJoined = () => {
-      console.log("Joined matchmaking queue")
+      // console.log("Joined matchmaking queue")
     }
 
     // Listen for matchmaking error
     const handleMatchmakingError = (data) => {
-      console.error("Matchmaking error:", data.message)
+      // console.error("Matchmaking error:", data.message)
       setError(data.message)
     }
 
     // Listen for match found event
     const handleMatchFound = (data) => {
-      console.log("Match found:", data)
       setOpponent(data.opponent)
       setMatchFound(true)
       setMatchId(data.matchId)

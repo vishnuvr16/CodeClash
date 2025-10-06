@@ -29,11 +29,11 @@ const STATUS_MAPPING = {
 // Enhanced code evaluation - runs all test cases but only shows first 2
 const evaluateCode = async (code, language, testCases, showAllResults = false) => {
   try {
-    console.log(`Evaluating ${language} code with ${testCases.length} test cases`)
+    // console.log(`Evaluating ${language} code with ${testCases.length} test cases`)
 
     // If Judge0 is not available, use simulation
     if (!process.env.JUDGE0_API_KEY) {
-      console.log("No Judge0 API key found, using simulation")
+      // console.log("No Judge0 API key found, using simulation")
       return simulateEvaluation(code, testCases, showAllResults)
     }
 
@@ -81,7 +81,7 @@ const evaluateCode = async (code, language, testCases, showAllResults = false) =
             isHidden: index >= 2, // Mark test cases after first 2 as hidden
           }
         } catch (error) {
-          console.error(`Error processing test case ${index + 1}:`, error)
+          // console.error(`Error processing test case ${index + 1}:`, error)
           return {
             testCase: index + 1,
             input: testCase.input,
@@ -146,7 +146,7 @@ const evaluateCode = async (code, language, testCases, showAllResults = false) =
       },
     }
   } catch (error) {
-    console.error("Code evaluation error:", error)
+    // console.error("Code evaluation error:", error)
     return {
       success: false,
       error: error.message || "Error evaluating code",
@@ -161,11 +161,11 @@ const evaluateCode = async (code, language, testCases, showAllResults = false) =
 // Simple code execution for single test case (Run button)
 const runCode = async (code, language, testCase) => {
   try {
-    console.log(`Running ${language} code`)
+    // console.log(`Running ${language} code`)
 
     // If Judge0 is not available, use simulation
     if (!process.env.JUDGE0_API_KEY) {
-      console.log("No Judge0 API key found, using simulation")
+      // console.log("No Judge0 API key found, using simulation")
       return simulateExecution(code, testCase)
     }
 
@@ -210,7 +210,7 @@ const runCode = async (code, language, testCase) => {
       },
     }
   } catch (error) {
-    console.error("Code execution error:", error)
+    // console.error("Code execution error:", error)
     return {
       success: false,
       error: error.message || "Error executing code",
@@ -257,13 +257,13 @@ const createSubmission = async (code, languageId, input) => {
     return response.data
   } catch (error) {
     if (error.response) {
-      console.error("Judge0 API Error:", error.response.status, error.response.data)
+      // console.error("Judge0 API Error:", error.response.status, error.response.data)
       throw new Error(`Judge0 API Error: ${error.response.status}`)
     } else if (error.request) {
-      console.error("Network Error:", error.message)
+      // console.error("Network Error:", error.message)
       throw new Error("Network error: Unable to reach Judge0 API")
     } else {
-      console.error("Request Error:", error.message)
+      // console.error("Request Error:", error.message)
       throw new Error(`Request error: ${error.message}`)
     }
   }
@@ -298,13 +298,13 @@ const getSubmissionResult = async (token) => {
       status = result.status?.id
       attempts++
 
-      console.log(`Polling attempt ${attempts}: Status ${status} (${STATUS_MAPPING[status] || "Unknown"})`)
+      // console.log(`Polling attempt ${attempts}: Status ${status} (${STATUS_MAPPING[status] || "Unknown"})`)
 
       if (status >= 3 || attempts >= maxAttempts) {
         break
       }
     } catch (error) {
-      console.error(`Polling error on attempt ${attempts}:`, error.message)
+      // console.error(`Polling error on attempt ${attempts}:`, error.message)
       attempts++
 
       if (attempts >= maxAttempts) {
@@ -355,7 +355,7 @@ const calculatePercentile = (avgTime, maxMemory) => {
 
 // Simulation functions for when Judge0 is not available
 const simulateEvaluation = (code, testCases, showAllResults = false) => {
-  console.log("Using simulation mode for code evaluation")
+  // console.log("Using simulation mode for code evaluation")
 
   const allResults = testCases.map((testCase, index) => {
     const hasLogic =
@@ -428,7 +428,7 @@ const simulateEvaluation = (code, testCases, showAllResults = false) => {
 }
 
 const simulateExecution = (code, testCase) => {
-  console.log("Using simulation mode for code execution")
+  // console.log("Using simulation mode for code execution")
 
   const hasLogic =
     code.length > 20 && (code.includes("print") || code.includes("console.log") || code.includes("System.out"))

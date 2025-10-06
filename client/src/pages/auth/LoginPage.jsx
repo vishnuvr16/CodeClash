@@ -8,6 +8,7 @@ const LoginPage = () => {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
+    rememberMe: false,
   })
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
@@ -18,10 +19,10 @@ const LoginPage = () => {
   const navigate = useNavigate()
 
   const handleChange = (e) => {
-    const { name, value } = e.target
+    const { name,type, value, checked } = e.target
     setFormData((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: type === "checkbox" ? checked : value,
     }))
 
     // Clear error when user types
@@ -76,9 +77,7 @@ const LoginPage = () => {
     const googleClientId = import.meta.env.VITE_APP_GOOGLE_CLIENT_ID
     const redirectUri = encodeURIComponent(`${window.location.origin}/auth/google/callback`)
 
-    console.log("google",googleClientId,redirectUri)
     const scope = encodeURIComponent("email profile")
-
     // Store the current URL to redirect back after login
     localStorage.setItem("authRedirect", window.location.pathname)
 
@@ -92,7 +91,7 @@ const LoginPage = () => {
     <div className="min-h-screen bg-gray-900 text-white">
       <Navbar />
 
-      <div className="max-w-md mx-auto mt-16 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-lg mx-auto mt-6 px-4 sm:px-6 lg:px-8">
         <div className="bg-gray-800 rounded-lg shadow-lg p-8">
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold">Welcome Back</h2>
@@ -149,8 +148,10 @@ const LoginPage = () => {
               <div className="flex items-center">
                 <input
                   id="remember-me"
-                  name="remember-me"
+                  name="rememberMe"
                   type="checkbox"
+                  checked={formData.rememberMe}
+                  onChange={handleChange}
                   className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-600 rounded bg-gray-700"
                 />
                 <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-300">

@@ -66,7 +66,6 @@ const RegisterPage = () => {
 
         if (res.ok) {
           const data = await res.json();
-          // For registration with Google, we go straight to dashboard since the account is created
           navigate('/dashboard');
         } else {
           console.error('Google sign-in failed');
@@ -83,7 +82,7 @@ const RegisterPage = () => {
     setGoogleLoading(true);
     try {
       if (window.google && window.google.accounts && googleInitialized) {
-        // Use the explicit rendering mode with a button click
+        // Using the explicit rendering mode with a button click
         window.google.accounts.id.prompt((notification) => {
           if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
             // Try the Google sign-in popup as fallback
@@ -166,7 +165,6 @@ const RegisterPage = () => {
       navigate("/login")
     } catch (error) {
       console.error("Registration error:", error)
-      // Error is handled by the AuthContext
     } finally {
       setIsLoading(false)
     }
@@ -218,7 +216,7 @@ const RegisterPage = () => {
     <div className="min-h-screen bg-gray-900 text-white">
       <Navbar />
 
-      <div className="max-w-md mx-auto mt-16 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-lg mx-auto mt-6 px-4 sm:px-6 lg:px-8">
         <div className="bg-gray-800 rounded-lg shadow-lg p-8">
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold">Create an Account</h2>

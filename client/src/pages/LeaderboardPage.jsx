@@ -1,5 +1,3 @@
-"use client"
-
 import { useState, useEffect } from "react"
 import { useAuth } from "../contexts/AuthContext"
 import Navbar from "../components/Navbar"
@@ -201,7 +199,7 @@ const LeaderboardPage = () => {
         <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 p-6 mb-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <form onSubmit={handleSearch} className="relative flex-grow max-w-md">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <div className="absolute inset-y-0 left-0 pl-3 flex bg-gray-500 rounded-lg items-center pointer-events-none">
                 <Search className="h-5 w-5 text-gray-400" />
               </div>
               <input
@@ -209,7 +207,7 @@ const LeaderboardPage = () => {
                 placeholder="Search players..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2 bg-gray-500  rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               />
             </form>
 
@@ -439,25 +437,32 @@ const LeaderboardPage = () => {
         </div>
 
         {/* Trophy Tiers Info */}
-        <div className="mt-12 bg-gray-800 rounded-xl shadow-sm border border-gray-700 p-6">
-          <h3 className="text-xl font-bold mb-6 flex items-center text-white">
-            <Star className="h-6 w-6 text-amber-500 mr-2" />
-            Trophy Tiers
+        <div className="mt-12 bg-gray-800 rounded-xl shadow-lg p-6">
+          <h3 className="text-xl font-bold mb-6 flex items-center">
+            <Award className="h-6 w-6 text-yellow-400 mr-2" />
+            Trophy Tiers Guide
           </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
             {[
-              { name: "Beginner", min: 0, max: 199, icon: "🔰", color: "text-slate-600", bg: "bg-slate-50" },
-              { name: "Intermediate", min: 200, max: 499, icon: "🏅", color: "text-purple-600", bg: "bg-purple-50" },
-              { name: "Advanced", min: 500, max: 999, icon: "🥉", color: "text-amber-600", bg: "bg-amber-50" },
-              { name: "Expert", min: 1000, max: 1999, icon: "🥈", color: "text-emerald-600", bg: "bg-emerald-50" },
-              { name: "Master", min: 2000, max: 2999, icon: "🥇", color: "text-blue-600", bg: "bg-blue-50" },
-              { name: "Champion", min: 3000, max: 4999, icon: "🏆", color: "text-cyan-600", bg: "bg-cyan-50" },
-              { name: "Legend", min: 5000, max: "∞", icon: "👑", color: "text-red-500", bg: "bg-red-50" },
+              { name: "Beginner", min: 0, max: 199, icon: "🔰", color: "text-gray-400" },
+              { name: "Intermediate", min: 200, max: 499, icon: "🏅", color: "text-purple-400" },
+              { name: "Advanced", min: 500, max: 999, icon: "🥉", color: "text-yellow-400" },
+              { name: "Expert", min: 1000, max: 1999, icon: "🥈", color: "text-green-400" },
+              { name: "Master", min: 2000, max: 2999, icon: "🥇", color: "text-blue-400" },
+              { name: "Champion", min: 3000, max: 4999, icon: "🏆", color: "text-cyan-400" },
+              { name: "Legend", min: 5000, max: "∞", icon: "👑", color: "text-red-400" },
             ].map((tier, index) => (
-              <div key={index} className={`text-center p-4 rounded-lg border border-gray-700 ${tier.bg}`}>
+              <div
+                key={index}
+                className={`text-center p-4 rounded-lg border transition-all ${
+                  currentUser?.trophies >= tier.min && (tier.max === "∞" || currentUser?.trophies <= tier.max)
+                    ? "border-yellow-500 bg-yellow-900/10"
+                    : "border-gray-700 bg-gray-900/20"
+                }`}
+              >
                 <div className="text-2xl mb-2">{tier.icon}</div>
                 <div className={`font-semibold ${tier.color}`}>{tier.name}</div>
-                <div className="text-xs text-slate-500 mt-1">
+                <div className="text-xs text-gray-400 mt-1">
                   {tier.min} - {tier.max}
                 </div>
               </div>

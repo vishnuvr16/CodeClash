@@ -57,7 +57,7 @@ const Dashboard = () => {
         setUserStats(profileResponse.data)
 
         // Fetch recent matches
-        const matchesResponse = await api.get(`/user/${currentUser._id}/recent-matches?limit=4`)
+        const matchesResponse = await api.get(`/user/${currentUser.id}/recent-matches?limit=4`)
         setRecentMatches(matchesResponse.data.matches)
       } catch (error) {
         console.error("Error fetching user data:", error)

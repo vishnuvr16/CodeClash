@@ -9,18 +9,18 @@ const runSeed = async () => {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     })
-    console.log("✅ Connected to MongoDB")
+    console.log("Connected to MongoDB")
 
-    console.log("🌱 Starting database seeding...")
+    console.log("Starting database seeding...")
     await seedDatabase()
-    console.log("✅ Database seeding completed successfully!")
+    console.log("Database seeding completed successfully!")
 
     await mongoose.disconnect()
-    console.log("🔌 Disconnected from MongoDB")
+    console.log("Disconnected from MongoDB")
 
     process.exit(0)
   } catch (error) {
-    console.error("❌ Error during seeding:", error)
+    console.error("Error during seeding:", error)
     process.exit(1)
   }
 }
