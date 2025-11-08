@@ -226,11 +226,12 @@ router.post("/login", authLimiter, sanitizeInputs, validateOrigin, async (req, r
     const cookieMaxAge = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000
     res.cookie("authToken", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: true,
+      sameSite: "none",
       maxAge: cookieMaxAge,
       path: "/",
     })
+
 
     logSecurityEvent("SUCCESSFUL_LOGIN", req, { userId: user._id, email: user.email })
 

@@ -22,7 +22,6 @@ const authenticateToken = async (req, res, next) => {
 
     const token = req.cookies?.authToken || req.header("Authorization")?.replace("Bearer ", "")
 
-    console.log("tokn",token);
     if (!token) {
       return res.status(401).json({
         error: "Access denied",
