@@ -15,6 +15,8 @@ const GoogleCallback = () => {
         const urlParams = new URLSearchParams(window.location.search)
         const code = urlParams.get("code")
 
+        console.log("logging , code",code);
+
         if (!code) {
           throw new Error("No authorization code found in the URL")
         }

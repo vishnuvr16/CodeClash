@@ -75,18 +75,15 @@ const LoginPage = () => {
     }
   }
 
-  // Handle Google Sign-In using redirect flow
   const handleGoogleSignIn = () => {
     setGoogleLoading(true)
 
-    // Create the OAuth URL manually
     const googleClientId = import.meta.env.VITE_APP_GOOGLE_CLIENT_ID
     const redirectUri = encodeURIComponent(`${window.location.origin}/auth/google/callback`)
 
     const scope = encodeURIComponent("email profile")
-    // Store the current URL to redirect back after login
     localStorage.setItem("authRedirect", window.location.pathname)
-
+    console.log("here");
     // Redirect to Google OAuth
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`
 

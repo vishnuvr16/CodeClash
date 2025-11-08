@@ -25,7 +25,7 @@ export const AuthProvider = ({ children }) => {
         setCurrentUser(response.data.user)
         setIsAuthenticated(true)
       } catch (error) {
-        // console.error("Token verification failed:", error)
+        console.error("Token verification failed:", error)
         // localStorage.removeItem("token")
         // setToken("")
       } finally {
@@ -55,8 +55,10 @@ export const AuthProvider = ({ children }) => {
       const response = await api.post("/auth/login", credentials)
       const { token, user } = response.data
 
+      console.log("user signed",token,user);
+
       localStorage.setItem("token", token)
-      setToken(token)
+      // setToken(token)
       setCurrentUser(user)
       setIsAuthenticated(true)
 
@@ -78,10 +80,12 @@ export const AuthProvider = ({ children }) => {
         redirectUri,
       })
 
+      console.log("Google login response:",response.data);
+
       const { token, user } = response.data
 
       localStorage.setItem("token", token)
-      setToken(token)
+      // setToken(token)
       setCurrentUser(user)
       setIsAuthenticated(true)
 

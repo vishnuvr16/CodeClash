@@ -118,18 +118,15 @@ const Navbar = () => {
       }
 
       // Close main menu dropdown if click is outside its ref area
-      // The `isMenuOpen` check ensures we only try to close if it's currently open
       if (menuRef.current && !menuRef.current.contains(event.target) && isMenuOpen) {
         setIsMenuOpen(false)
       }
 
-      // Close sidebar if click is outside its ref area
-      // Added `isSidebarOpen` check and exclusion for the button that opens it
       if (
         sidebarRef.current &&
         !sidebarRef.current.contains(event.target) &&
-        isSidebarOpen && // Only close if it's open
-        !event.target.closest(".mobile-menu-btn") // Don't close if click is on the button that opens it
+        isSidebarOpen &&
+        !event.target.closest(".mobile-menu-btn")
       ) {
         setIsSidebarOpen(false)
       }
@@ -140,9 +137,6 @@ const Navbar = () => {
     return () => {
       document.removeEventListener("mousedown", handleClickOutside)
     }
-    // Added `isProfileOpen` to dependencies for robustness:
-    // This ensures the `handleClickOutside` function re-runs if `isProfileOpen` state changes,
-    // which can prevent stale closures from interfering with open/close logic.
   }, [isProfileOpen, isMenuOpen, isSidebarOpen]) 
 
   // Prevent body scroll when sidebar is open

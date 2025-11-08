@@ -237,6 +237,7 @@ router.post("/login", authLimiter, sanitizeInputs, validateOrigin, async (req, r
     res.json({
       success: true,
       message: "Login successful",
+      token: token,
       user: {
         id: user._id,
         username: user.username,
