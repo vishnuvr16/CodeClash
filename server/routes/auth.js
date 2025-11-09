@@ -186,7 +186,7 @@ router.post("/login", authLimiter, sanitizeInputs, validateOrigin, async (req, r
     }
 
     // Check password
-    const validPassword = await bcrypt.compare(password, user.password)
+    const validPassword = bcrypt.compare(password, user.password)
 
     if (!validPassword) {
       // Increment failed login attempts
