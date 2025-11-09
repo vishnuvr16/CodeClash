@@ -26,6 +26,7 @@ const { sanitizeInputs } = require("./middleware/auth")
 
 // Create Express app
 const app = express()
+app.set("trust proxy",1);
 const server = http.createServer(app)
 
 // Configure CORS with specific options
