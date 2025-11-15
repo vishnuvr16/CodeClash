@@ -4,7 +4,7 @@ require("dotenv").config()
 
 const runSeed = async () => {
   try {
-    console.log("🌱 Connecting to database...")
+    console.log("Connecting to database...")
     await mongoose.connect(process.env.MONGODB_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,

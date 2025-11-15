@@ -21,7 +21,7 @@ const ResultPage = () => {
         setIsLoading(true)
         setError(null)
 
-        const response = await api.get(`/match/${matchId}`)
+        const response = await api.get(`/matches/${matchId}`)
         setMatch(response.data)
       } catch (error) {
         console.error("Error fetching match result:", error)

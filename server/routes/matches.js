@@ -53,13 +53,7 @@ router.get("/:id", authenticateToken, async (req, res) => {
     }
 
     // If match is completed, don't allow access to duel page
-    if (match.status === "completed") {
-      return res.status(410).json({
-        success: false,
-        message: "Match has already been completed",
-        redirectTo: `/result/${id}`,
-      })
-    }
+    
 
     res.json({
       success: true,

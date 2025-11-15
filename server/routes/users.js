@@ -281,6 +281,7 @@ router.get("/dashboard", authenticateToken, async (req, res) => {
 
 // Get user's trophy history
 router.get("/trophy-history", authenticateToken, async (req, res) => {
+
   try {
     const user = await User.findById(req.user._id)
       .populate("trophyHistory.problemId", "title difficulty")

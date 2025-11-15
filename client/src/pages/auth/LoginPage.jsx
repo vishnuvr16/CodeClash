@@ -31,7 +31,6 @@ const LoginPage = () => {
       [name]: type === "checkbox" ? checked : value,
     }))
 
-    // Clear error when user types
     if (errors[name]) {
       setErrors((prev) => ({
         ...prev,
@@ -83,7 +82,6 @@ const LoginPage = () => {
 
     const scope = encodeURIComponent("email profile")
     localStorage.setItem("authRedirect", window.location.pathname)
-    console.log("here");
     // Redirect to Google OAuth
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`
 

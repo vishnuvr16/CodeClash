@@ -88,7 +88,7 @@ const ProfilePage = () => {
         }
 
         // Fetch match history
-        const historyResponse = await api.get("/match/user/history")
+        const historyResponse = await api.get("/matches/user/history")
         if (historyResponse.data && historyResponse.data.success) {
           setMatchHistory(historyResponse.data.matches || [])
         }
@@ -154,7 +154,7 @@ const ProfilePage = () => {
 
       const response = await api.put("/user/profile", formData, {
         headers: {
-          // "Content-Type": "multipart/form-data",
+          "Content-Type": "multipart/form-data",
         },
       })
 
@@ -369,7 +369,7 @@ const ProfilePage = () => {
       <Navbar />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <h1 className="text-3xl font-bold mb-8">My Profile</h1>
+        {/* <h1 className="text-3xl font-bold mb-8">My Profile</h1> */}
 
         <div className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
           <div className="flex flex-col md:flex-row">

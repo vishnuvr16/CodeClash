@@ -29,7 +29,6 @@ const TrophyHistoryPage = () => {
     try {
       setIsLoading(true)
       setError(null)
-
       const response = await api.get("/user/trophy-history")
 
       if (response.data && response.data.success) {

@@ -80,10 +80,10 @@ const setupSocketHandlers = (io) => {
       const userId = socket.user._id.toString()
 
       // Check if user is already in queue
-      if (matchmakingQueue.some((user) => user.id === userId)) {
-        socket.emit("error", { message: "Already in matchmaking queue" })
-        return
-      }
+      // if (matchmakingQueue.some((user) => user.id === userId)) {
+      //   socket.emit("error", { message: "Already in matchmaking queue" })
+      //   return
+      // }
 
       // Add user to queue with trophy-based matchmaking
       matchmakingQueue.push({

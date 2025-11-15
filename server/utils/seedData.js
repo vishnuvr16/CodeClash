@@ -4,7 +4,7 @@ const User = require("../models/User")
 const seedProblems = async () => {
   try {
     // Clear existing problems
-    console.log("Cleared existing problems")
+    // console.log("Cleared existing problems")
 
     const problems = [
       {
@@ -270,7 +270,7 @@ Print the index of target (0-based) or -1 if not found.`,
 
     // Insert problems
     const insertedProblems = await Problem.insertMany(problems)
-    console.log(`Inserted ${insertedProblems.length} problems`)
+    // console.log(`Inserted ${insertedProblems.length} problems`)
 
     return insertedProblems
   } catch (error) {
@@ -292,10 +292,10 @@ const seedUsers = async () => {
         isAdmin: true,
       })
       await admin.save()
-      console.log("Created admin user")
+      // console.log("Created admin user")
     }
 
-    console.log("User seeding completed")
+    // console.log("User seeding completed")
   } catch (error) {
     console.error("Error seeding users:", error)
     throw error
@@ -304,10 +304,10 @@ const seedUsers = async () => {
 
 const seedDatabase = async () => {
   try {
-    console.log("Starting database seeding...")
+    // console.log("Starting database seeding...")
     await seedProblems()
     await seedUsers()
-    console.log("Database seeding completed successfully!")
+    // console.log("Database seeding completed successfully!")
   } catch (error) {
     console.error("Database seeding failed:", error)
     process.exit(1)

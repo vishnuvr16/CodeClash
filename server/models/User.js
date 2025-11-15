@@ -236,18 +236,13 @@ userSchema.pre("save", async function (next) {
   if (!this.isModified("password") || !this.password) return next()
 
   try {
-    const salt = await bcrypt.genSalt(10)
-    this.password = await bcrypt.hash(this.password, salt)
+    this.password = await bcrypt.hash(this.password, 10);
     next()
   } catch (error) {
     next(error)
   }
 })
 
-// Method to compare passwords
-userSchema.methods.comparePassword = async function (candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.password)
-}
 
 
 // Ensure virtual fields are serialized

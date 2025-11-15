@@ -44,217 +44,76 @@ const validatePassword = (password) => {
 }
 
 // Register a new user with enhanced security
-router.post("/register", sanitizeInputs, validateOrigin, async (req, res) => {
+router.post("/register", async (req, res) => {
   try {
-    // console.log("Registration attempt:", req.body)
     const { username, email, password } = req.body
 
-    // Input validation
     if (!username || !email || !password) {
-      logSecurityEvent("INVALID_REGISTRATION_ATTEMPT", req, { reason: "Missing fields" })
-      return res.status(400).json({
-        error: "Validation failed",
-        message: "All fields are required",
-      })
+      return res.status(400).json({ message: "All fields are required" })
     }
 
-    if (!validateUsername(username)) {
-      return res.status(400).json({
-        error: "Invalid username",
-        message: "Username must be 3-30 characters and contain only letters, numbers, hyphens, and underscores",
-      })
-    }
-
-    if (!validateEmail(email)) {
-      return res.status(400).json({
-        error: "Invalid email",
-        message: "Please provide a valid email address",
-      })
-    }
-
-    if (!validatePassword(password)) {
-      return res.status(400).json({
-        error: "Weak password",
-        message: "Password must be 8-128 characters with uppercase, lowercase, number, and special character",
-      })
-    }
-
-    // Check if user already exists (case-insensitive)
-    const existingUser = await User.findOne({
-      $or: [
-        { username: { $regex: new RegExp(`^${username}$`, "i") } },
-        { email: { $regex: new RegExp(`^${email}$`, "i") } },
-      ],
-    })
-
+    const existingUser = await User.findOne({ email })
     if (existingUser) {
-      logSecurityEvent("DUPLICATE_REGISTRATION_ATTEMPT", req, {
-        username,
-        email,
-        existingField: existingUser.username.toLowerCase() === username.toLowerCase() ? "username" : "email",
-      })
-      return res.status(409).json({
-        error: "User exists",
-        message: "Username or email already taken",
-      })
+      return res.status(409).json({ message: "User already exists" })
     }
 
-    // Hash the password with high cost factor
-    const saltRounds = 12
-    const hashedPassword = await bcrypt.hash(password, saltRounds)
+    const user = await User.create({
+      username,
+      email,
+      password
+    });
 
-    // Create new user with security fields
-    const newUser = new User({
-      username: username.toLowerCase(),
-      email: email.toLowerCase(),
-      password: hashedPassword,
-      emailVerified: false,
-      accountLocked: false,
-      loginAttempts: 0,
-      createdAt: new Date(),
-      lastLogin: null,
-      passwordChangedAt: new Date(),
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "1d" })
+
+    res.json({
+      message: "User Registered successfully",
+      token: token,
+      user: { id: user._id, username: user.username, email: user.email },
     })
-
-    // Save the user
-    await newUser.save()
-
-    const token = generateSecureToken({ id: newUser._id }, "24h")
-
-    // Set secure HTTP-only cookie
-    const cookieMaxAge = 24 * 60 * 60 * 1000
-    res.cookie("authToken", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: cookieMaxAge,
-      path: "/",
-    })
-
-    logSecurityEvent("USER_REGISTERED", req, { userId: newUser._id, username, email })
-
-    res.status(201).json({
-      success: true,
-      message: "User created successfully. Please verify your email.",
-    })
-  } catch (error) {
-    // console.error("Registration error:", error)
-    logSecurityEvent("REGISTRATION_ERROR", req, { error: error.message })
-    res.status(500).json({
-      error: "Registration failed",
-      message: "Unable to create account. Please try again.",
-    })
+  } catch (err) {
+    console.error("Register error:", err)
+    res.status(500).json({ message: "Server error" })
   }
 })
 
-// Login user with enhanced security
-router.post("/login", authLimiter, sanitizeInputs, validateOrigin, async (req, res) => {
+// LOGIN
+router.post("/login", async (req, res) => {
   try {
-    const { email, password, rememberMe } = req.body
+    const { email, password } = req.body
 
-    // Input validation
     if (!email || !password) {
-      logSecurityEvent("INVALID_LOGIN_ATTEMPT", req, { reason: "Missing credentials" })
-      return res.status(400).json({
-        error: "Invalid input",
-        message: "Email and password are required",
-      })
+      return res.status(400).json({ message: "Email and password required" })
     }
 
-    // Find the user (case-insensitive)
-    const user = await User.findOne({
-      $or: [
-        { email: { $regex: new RegExp(`^${email}$`, "i") } },
-      ],
-    })
-
+    const user = await User.findOne({ email })
     if (!user) {
-      logSecurityEvent("LOGIN_ATTEMPT_NONEXISTENT_USER", req, { email })
-      return res.status(401).json({
-        error: "Invalid credentials",
-        message: "Email or password is incorrect",
-      })
+      return res.status(401).json({ message: "Invalid email or password" })
     }
 
-    // Check if account is locked
-    if (user.accountLocked) {
-      logSecurityEvent("LOGIN_ATTEMPT_LOCKED_ACCOUNT", req, { userId: user._id, email })
-      return res.status(423).json({
-        error: "Account locked",
-        message: "Account is locked due to too many failed attempts. Please reset your password.",
-      })
-    }
-
-    // Check password
-    const validPassword = bcrypt.compare(password, user.password)
-
+    const validPassword = await bcrypt.compare(password, user.password)
     if (!validPassword) {
-      // Increment failed login attempts
-      user.loginAttempts = (user.loginAttempts || 0) + 1
-
-      // Lock account after 5 failed attempts
-      if (user.loginAttempts >= 5) {
-        user.accountLocked = true
-        logSecurityEvent("ACCOUNT_LOCKED", req, { userId: user._id, email, attempts: user.loginAttempts })
-      }
-
-      await user.save()
-
-      logSecurityEvent("FAILED_LOGIN_ATTEMPT", req, {
-        userId: user._id,
-        email,
-        attempts: user.loginAttempts,
-      })
-
-      return res.status(401).json({
-        error: "Invalid credentials",
-        message: "Email or password is incorrect",
-      })
+      return res.status(401).json({ message: "Invalid email or password" })
     }
 
-    // Reset login attempts on successful login
-    user.loginAttempts = 0
-    user.lastLogin = new Date()
-    await user.save()
+    // Generate JWT
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "1d" })
 
-    // After successful password validation and before sending response:
-    // Generate secure token
-    const tokenExpiry = rememberMe ? "30d" : "24h"
-    const token = generateSecureToken({ id: user._id }, tokenExpiry)
-
-    // Set secure HTTP-only cookie
-    const cookieMaxAge = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000
+    // Send cookie
     res.cookie("authToken", token, {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === "production",
       sameSite: "none",
-      maxAge: cookieMaxAge,
-      path: "/",
+      maxAge: 24 * 60 * 60 * 1000, // 1 day
     })
-
-
-    logSecurityEvent("SUCCESSFUL_LOGIN", req, { userId: user._id, email: user.email })
 
     res.json({
-      success: true,
       message: "Login successful",
       token: token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        trophies: user.trophies,
-        tier: user.tier,
-        profilePicture: user.profilePicture,
-      },
+      user: { id: user._id, username: user.username, email: user.email },
     })
-  } catch (error) {
-    // console.error("Login error:", error)
-    logSecurityEvent("LOGIN_ERROR", req, { error: error.message })
-    res.status(500).json({
-      error: "Login failed",
-      message: "Unable to process login. Please try again.",
-    })
+  } catch (err) {
+    console.error("Login error:", err)
+    res.status(500).json({ message: "Server error" })
   }
 })
 
@@ -558,11 +417,11 @@ router.put("/profile", authenticateToken, sanitizeInputs, async (req, res) => {
 // Username availability check with rate limiting
 router.get(
   "/check-username",
-  rateLimit({
-    windowMs: 60 * 1000, // 1 minute
-    max: 10, // 10 checks per minute
-    message: { error: "Too many username checks, please slow down" },
-  }),
+  // rateLimit({
+  //   windowMs: 60 * 1000, // 1 minute
+  //   max: 10, // 10 checks per minute
+  //   message: { error: "Too many username checks, please slow down" },
+  // }),
   async (req, res) => {
     try {
       const { username } = req.query

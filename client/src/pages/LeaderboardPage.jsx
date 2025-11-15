@@ -5,6 +5,7 @@ import Footer from "../components/Footer"
 import { Trophy, Medal, Crown, Star, Search, RefreshCw, TrendingUp, Users, Award, Zap } from "lucide-react"
 import api from "../utils/api"
 import { toast } from "react-toastify"
+import { Link } from "react-router-dom"
 
 const LeaderboardPage = () => {
   const { currentUser } = useAuth()
@@ -184,13 +185,13 @@ const LeaderboardPage = () => {
                   </div>
                 </div>
               </div>
-              <a
-                href="/trophy-history"
+              <Link
+                to="/trophy-history"
                 className="inline-flex items-center px-4 py-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-lg transition-all"
               >
                 <Trophy className="h-5 w-5 mr-2" />
                 Trophy History
-              </a>
+              </Link>
             </div>
           </div>
         )}

@@ -89,7 +89,7 @@ const sendMatchResultEmail = async (email, matchData) => {
     }
 
     await transporter.sendMail(mailOptions)
-    console.log(`Match result email sent to ${email}`)
+    // console.log(`Match result email sent to ${email}`)
   } catch (error) {
     console.error("Error sending match result email:", error)
     throw error
@@ -147,7 +147,7 @@ const sendWelcomeEmail = async (email, username) => {
     }
 
     await transporter.sendMail(mailOptions)
-    console.log(`Welcome email sent to ${email}`)
+    // console.log(`Welcome email sent to ${email}`)
   } catch (error) {
     console.error("Error sending welcome email:", error)
   }

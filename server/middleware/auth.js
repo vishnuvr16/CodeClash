@@ -3,18 +3,6 @@ const User = require("../models/User")
 const rateLimit = require("express-rate-limit")
 
 const JWT_SECRET = process.env.JWT_SECRET
-// if (!JWT_SECRET || JWT_SECRET.length < 32) {
-//   throw new Error("JWT_SECRET must be at least 32 characters long")
-// }
-
-// Rate limiting for authentication attempts
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Limit each IP to 10 auth requests per windowMs
-  message: { error: "Too many authentication attempts, please try again later" },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
 
 // Middleware to authenticate JWT token from HTTP-only cookies
 const authenticateToken = async (req, res, next) => {
@@ -42,22 +30,22 @@ const authenticateToken = async (req, res, next) => {
         path: "/",
       })
 
-      // if (error.name === "TokenExpiredError") {
-      //   return res.status(401).json({
-      //     error: "Token expired",
-      //     message: "Please login again",
-      //   })
-      // }
-      // if (error.name === "JsonWebTokenError") {
-      //   return res.status(401).json({
-      //     error: "Invalid token",
-      //     message: "Authentication failed",
-      //   })
-      // }
-      // return res.status(401).json({
-      //   error: "Token verification failed",
-      //   message: "Authentication error",
-      // })
+      if (error.name === "TokenExpiredError") {
+        return res.status(401).json({
+          error: "Token expired",
+          message: "Please login again",
+        })
+      }
+      if (error.name === "JsonWebTokenError") {
+        return res.status(401).json({
+          error: "Invalid token",
+          message: "Authentication failed",
+        })
+      }
+      return res.status(401).json({
+        error: "Token verification failed",
+        message: "Authentication error",
+      })
     }
 
     const user = await User.findById(decoded.id).select("-password -__v")
@@ -257,7 +245,6 @@ module.exports = {
   isAdmin,
   sanitizeInputs,
   validateOrigin,
-  authLimiter,
   logSecurityEvent,
   generateSecureToken,
   setSecureCookie,

@@ -10,24 +10,25 @@ export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loading, setLoading] = useState(true)
-  // const [token, setToken] = useState("")
+  const [token, setToken] = useState(localStorage.getItem("token") || "")
 
   // Check if user is authenticated on initial load
   useEffect(() => {
     const verifyToken = async () => {
-      // if (!token) {
-      //   setLoading(false)
-      //   return
-      // }
+      if (!token) {
+        setLoading(false)
+        return
+      }
 
       try {
         const response = await api.get("/auth/verify")
+
         setCurrentUser(response.data.user)
         setIsAuthenticated(true)
       } catch (error) {
         console.error("Token verification failed:", error)
-        // localStorage.removeItem("token")
-        // setToken("")
+        localStorage.removeItem("token")
+        setToken("")
       } finally {
         setLoading(false)
       }
@@ -40,8 +41,12 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     try {
       const response = await api.post("/auth/register", userData)
+      const {token,user} = response.data;
+
+      localStorage.setItem("token",token);
+
       toast.success("Registration successful! Please log in.")
-      return response.data
+      return user
     } catch (error) {
       const message = error.response?.data?.message || "Registration failed"
       toast.error(message)
@@ -55,10 +60,8 @@ export const AuthProvider = ({ children }) => {
       const response = await api.post("/auth/login", credentials)
       const { token, user } = response.data
 
-      console.log("user signed",token,user);
-
       localStorage.setItem("token", token)
-      // setToken(token)
+      setToken(token)
       setCurrentUser(user)
       setIsAuthenticated(true)
 
@@ -79,8 +82,6 @@ export const AuthProvider = ({ children }) => {
         code,
         redirectUri,
       })
-
-      console.log("Google login response:",response.data);
 
       const { token, user } = response.data
 

@@ -8,7 +8,22 @@ const api = axios.create({
   withCredentials: true, 
 })
 
-// Optional: response interceptor to handle errors
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
+
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+//response interceptor to handle errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
